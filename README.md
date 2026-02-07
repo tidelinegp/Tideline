@@ -1,10 +1,14 @@
+# Bolt
+
+A third-party, free-software launcher for your favourite MMORPG.
+
 [![Please don't upload to GitHub](https://nogithub.codeberg.page/badge.svg)](https://nogithub.codeberg.page)
 
 # Table of Contents
-- [Table of Contents](#table-of-contents)
 - [Bolt](#bolt)
-  - [Contact](#contact)
+- [Table of Contents](#table-of-contents)
   - [Installing](#installing)
+  - [Contact](#contact)
   - [Building](#building)
     - [Linux](#linux)
     - [Windows](#windows)
@@ -15,19 +19,6 @@
   - [Credit](#credit)
   - [Disclaimer](#disclaimer)
 
-# Bolt
-
-A third-party launcher for your favourite MMO
-
-<p align="center">
-  <img src="./screenshot/dark.png" alt="Bolt screenshot" width="49%"/>
-  <img src="./screenshot/light.png" alt="Bolt screenshot" width="49%"/>
-</p>
-
-## Contact
-
-Bolt, as well as the other Linux community projects, is being discussed at [7orm's Discord server](https://discord.gg/aX7GT2Mkdu). If you want to talk about development or need help getting set up, that's the place to go.
-
 ## Installing
 
 For Linux/Steamdeck users, Bolt is available on the following package managers:
@@ -36,11 +27,16 @@ For Linux/Steamdeck users, Bolt is available on the following package managers:
 - nix: `bolt-launcher`
 
 Instructions on installing flatpak can be found [here](https://flatpak.org/setup/)
-Others should see the "releases" section on the right.
+
+For Windows, see the [Releases](https://codeberg.org/Adamcake/Bolt/Releases) section (also linked at the top of this page).
+
+## Contact
+
+Bolt is one of the projects being discussed at [7orm's Discord server](https://discord.gg/aX7GT2Mkdu). If you want to talk about development or need help getting set up, that's the place to go.
 
 ## Building
 
-If you just want to get Bolt installed then you don't need to build it from source! See the "Installing" section.
+If you just want to get Bolt installed then you don't need to build it from source! See the "Installing" section above.
 
 But if you do want to build from source, the first thing you should know is that Bolt is based on [Chromium Embedded Framework](https://bitbucket.org/chromiumembedded/cef) (CEF), so to build it, you'll first need either to [build](https://bitbucket.org/chromiumembedded/cef/wiki/MasterBuildQuickStart.md) or [download](https://adamcake.com/cef) a binary distribution of CEF.
 
@@ -167,7 +163,13 @@ cmake --build --preset clang-app
 
 ## Contributing
 
-There's not much to say here except that I have fairly high standards, so don't give me code that's messy or unfinished. Use a development environment that supports [editorconfig](https://editorconfig.org/) before starting work. If committing to the frontend UI then see [app/README.md](https://codeberg.org/Adamcake/Bolt/src/branch/master/app#app), especially the Linting & Formatting section, for some UI-specific guidelines. Follow the general etiquette of git, i.e. commit messages 50 characters maximum, all changes in a commit must be relevant to the commit, and all commits in a PR must be relevant to the PR.
+Do not upload my code to Github. If you have a pre-existing fork of my code on Github, please delete it. Do not expose this repository to an LLM or AI tool, including Copilot (which you're doing indirectly if you upload it to Github.) AI does not and cannot respect the AGPLv3 licence of this repository, which is illegal. If you've done this I will not accept your PR under any circumstances. For more information, [click here](https://nogithub.codeberg.page).
+
+Use a development environment that supports [editorconfig](https://editorconfig.org/) before starting work.
+
+If committing to the frontend UI then see [app/README.md](https://codeberg.org/Adamcake/Bolt/src/branch/master/app#app), especially the Linting & Formatting section, for some UI-specific guidelines.
+
+Follow the general etiquette of git, i.e. commit messages 50 characters maximum, all changes in a commit must be relevant to the commit, and all commits in a PR must be relevant to the PR. Keep it concise and useful so I can review it properly.
 
 ## Credit
 
