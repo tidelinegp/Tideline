@@ -28,7 +28,7 @@ For Linux/Steamdeck users, Bolt is available on the following package managers:
 
 Instructions on installing flatpak can be found [here](https://flatpak.org/setup/)
 
-For Windows, see the [Releases](https://codeberg.org/Adamcake/Bolt/Releases) section (also linked at the top of this page).
+For Windows, see the [Releases](https://codeberg.org/Adamcake/Bolt/releases) section (also linked at the top of this page).
 
 ## Contact
 
