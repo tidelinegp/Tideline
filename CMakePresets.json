@@ -98,6 +98,25 @@
         "BOLT_DEV_SHOW_DEVTOOLS": "1",
         "BOLT_DEV_LAUNCHER_DIRECTORY": "1"
       }
+    },
+    {
+      "name": "release-msvc",
+      "displayName": "Release MSVC",
+      "description": "Configure a Release build.",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+     }
+    },
+    {
+      "name": "release-msvc-skip-libs",
+      "displayName": "Release MSVC",
+      "description": "Configure a Release build skipping library builds.",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BOLT_SKIP_LIBRARIES": "1"
+      }
     }
   ],
   "buildPresets": [
@@ -142,6 +161,18 @@
       "displayName": "Build Clang: Frontend with DevTools",
       "configurePreset": "clang-app",
       "targets": ["install"]
-    }
+    },
+    {
+      "name": "release-msvc",
+      "displayName": "Build Release MSVC",
+      "configurePreset": "release-msvc",
+      "targets": ["install"]
+    },
+    {
+      "name": "release-msvc-skip-libs",
+      "displayName": "Build Release MSVC: Skip Libs",
+      "configurePreset": "release-msvc-skip-libs",
+      "targets": ["install"]
+    },	
   ]
 }
