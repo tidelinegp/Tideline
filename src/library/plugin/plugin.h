@@ -408,6 +408,8 @@ struct RenderBatch2D {
     uint32_t screen_height;
     uint32_t index_count;
     uint32_t vertices_per_icon;
+    uint32_t tex_width;
+    uint32_t tex_height;
     uint8_t is_interface_scaled;
     float interface_scale;
     struct Vertex2DFunctions vertex_functions;
@@ -416,6 +418,8 @@ struct RenderBatch2D {
 
 struct Render3D {
     uint32_t vertex_count;
+    uint32_t tex_width;
+    uint32_t tex_height;
     uint8_t is_animated;
     struct Vertex3DFunctions vertex_functions;
     struct TextureFunctions texture_functions;
@@ -425,6 +429,8 @@ struct Render3D {
 
 struct RenderParticles {
     uint32_t vertex_count;
+    uint32_t tex_width;
+    uint32_t tex_height;
     struct VertexParticleFunctions vertex_functions;
     struct MatrixFunctions matrix_functions;
     struct TextureFunctions texture_functions;
@@ -434,6 +440,8 @@ struct RenderParticles {
 struct RenderBillboard {
     uint32_t vertex_count;
     uint32_t vertices_per_icon;
+    uint32_t tex_width;
+    uint32_t tex_height;
     struct VertexBillboardFunctions vertex_functions;
     struct MatrixFunctions matrix_functions;
     struct TextureFunctions texture_functions;

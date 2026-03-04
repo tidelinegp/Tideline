@@ -2442,6 +2442,8 @@ static void drawelements_handle_particles(GLsizei count, const unsigned short* i
 
     struct RenderParticles render;
     render.vertex_count = count;
+    render.tex_width = tex->width;
+    render.tex_height = tex->height;
     render.vertex_functions.userdata = &vertex_userdata;
     render.vertex_functions.xyz = glplugin_drawelements_vertexparticles_xyz;
     render.vertex_functions.world_offset = glplugin_drawelements_vertexparticles_world_offset;
@@ -2513,6 +2515,8 @@ static void drawelements_handle_billboard(GLsizei count, const unsigned short* i
     struct RenderBillboard render;
     render.vertex_count = count;
     render.vertices_per_icon = 6;
+    render.tex_width = tex->width;
+    render.tex_height = tex->height;
     render.vertex_functions.userdata = &vertex_userdata;
     render.vertex_functions.xyz = glplugin_drawelements_vertexbillboard_xyz;
     render.vertex_functions.eye_offset = glplugin_drawelements_vertexbillboard_eye_offset;
@@ -2681,6 +2685,8 @@ static void drawelements_handle_2d_normal(GLsizei count, const unsigned short* i
     batch.screen_height = vertex_userdata.screen_height;
     batch.index_count = count;
     batch.vertices_per_icon = 6;
+    batch.tex_width = tex->width;
+    batch.tex_height = tex->height;
     batch.is_interface_scaled = is_interface_scaled && gl_width != batch.screen_width;
     batch.interface_scale = (float)gl_width / (float)batch.screen_width;
     batch.vertex_functions.userdata = &vertex_userdata;
@@ -2803,6 +2809,8 @@ static void drawelements_handle_3d_normal(GLsizei count, const unsigned short* i
 
     struct Render3D render;
     render.vertex_count = count;
+    render.tex_width = tex->width;
+    render.tex_height = tex->height;
     render.is_animated = c->bound_program->block_index_VertexTransformData != -1;
     render.vertex_functions.userdata = &vertex_userdata;
     render.vertex_functions.xyz = glplugin_drawelements_vertex3d_xyz;
@@ -3455,13 +3463,6 @@ static uint8_t glplugin_texture_compare(void* userdata, size_t x, size_t y, size
     const struct GLPluginTextureUserData* data_ = userdata;
     const struct GLTexture2D* tex = data_->tex;
     const size_t start_offset = (tex->width * y * 4) + (x * 4);
-    if (start_offset + len > tex->width * tex->height * 4) {
-        printf(
-            "warning: out-of-bounds texture compare attempt: tried to read %zu bytes at %zu,%zu of texture id=%u w,h=%u,%u\n",
-            len, x, y, tex->id, tex->width, tex->height
-        );
-        return 0;
-    }
     return !memcmp(tex->data + start_offset, data, len);
 }
 

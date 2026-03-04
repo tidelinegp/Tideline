@@ -76,7 +76,7 @@ static int api_browser_on##APINAME(lua_State* state) { \
 static void* require_userdata(lua_State* state, int n, const char* apiname) {
     void* ret = lua_touserdata(state, n);
     if (!ret) {
-        lua_pushfstring(state, "%s: incorrect argument at position %i, expected userdata", apiname, n);
+        lua_pushfstring(state, "%s: incorrect argument at position %d, expected userdata", apiname, n);
         lua_error(state);
     }
     return ret;
@@ -141,7 +141,7 @@ static int shaderbuffer_gc(lua_State* state) {
 static TYPE internal_buffer_get##FNAME(lua_State* state, const void* data, size_t data_size, long offset) { \
     TYPE ret; \
     if (offset < 0 || (offset + sizeof(TYPE)) > data_size) { \
-        lua_pushfstring(state, "buffer get" #FNAME ": out-of-bounds read (buffer length %lu, reading at %li)", data_size, offset); \
+        lua_pushfstring(state, "buffer get" #FNAME ": out-of-bounds read (buffer length %d, reading at %d)", data_size, offset); \
         lua_error(state); \
     } \
     memcpy(&ret, (uint8_t*)data + offset, sizeof ret); \
@@ -149,7 +149,7 @@ static TYPE internal_buffer_get##FNAME(lua_State* state, const void* data, size_
 } \
 static void internal_buffer_set##FNAME(lua_State* state, void* data, size_t data_size, long offset, TYPE value) { \
     if (offset < 0 || (offset + sizeof(TYPE)) > data_size) { \
-        lua_pushfstring(state, "buffer set" #FNAME ": out-of-bounds write (buffer length %lu, writing at %li)", data_size, offset); \
+        lua_pushfstring(state, "buffer set" #FNAME ": out-of-bounds write (buffer length %d, writing at %d)", data_size, offset); \
         lua_error(state); \
     } \
     memcpy((uint8_t*)data + offset, &value, sizeof value); \
@@ -158,14 +158,14 @@ static void internal_buffer_set##FNAME(lua_State* state, void* data, size_t data
 #define DEFBUFFERINTERNAL_1BYTE(TYPE, FNAME, LUATYPE) \
 static TYPE internal_buffer_get##FNAME(lua_State* state, const void* data, size_t data_size, long offset) { \
     if (offset < 0 || offset >= data_size) { \
-        lua_pushfstring(state, "buffer get" #FNAME ": out-of-bounds read (buffer length %lu, reading at %li)", data_size, offset); \
+        lua_pushfstring(state, "buffer get" #FNAME ": out-of-bounds read (buffer length %d, reading at %d)", data_size, offset); \
         lua_error(state); \
     } \
     return ((TYPE*)data)[offset]; \
 } \
 static void internal_buffer_set##FNAME(lua_State* state, void* data, size_t data_size, long offset, TYPE value) { \
     if (offset < 0 || offset >= data_size) { \
-        lua_pushfstring(state, "buffer set" #FNAME ": out-of-bounds write (buffer length %lu, writing at %li)", data_size, offset); \
+        lua_pushfstring(state, "buffer set" #FNAME ": out-of-bounds write (buffer length %d, writing at %d)", data_size, offset); \
         lua_error(state); \
     } \
     ((TYPE*)data)[offset] = value; \
@@ -235,11 +235,11 @@ static int api_checkversion(lua_State* state) {
     lua_Integer expected_major = luaL_checkinteger(state, 1);
     lua_Integer expected_minor = luaL_checkinteger(state, 2);
     if (expected_major != API_VERSION_MAJOR) {
-        lua_pushfstring(state, "checkversion major version mismatch: major version is %u, plugin expects %u", API_VERSION_MAJOR, (unsigned int)expected_major);
+        lua_pushfstring(state, "checkversion major version mismatch: major version is %d, plugin expects %d", API_VERSION_MAJOR, expected_major);
         lua_error(state);
     }
     if (expected_minor > API_VERSION_MINOR) {
-        lua_pushfstring(state, "checkversion minor version mismatch: minor version is %u, plugin expects at least %u", API_VERSION_MINOR, (unsigned int)expected_minor);
+        lua_pushfstring(state, "checkversion minor version mismatch: minor version is %d, plugin expects at least %d", API_VERSION_MINOR, expected_minor);
         lua_error(state);
     }
     return 2;
@@ -740,7 +740,7 @@ static int api_createbuffer(lua_State* state) {
     struct FixedBuffer* buffer = lua_newuserdata(state, sizeof(struct FixedBuffer));
     buffer->data = calloc(size, 1);
     if (!buffer->data) {
-        lua_pushfstring(state, "createbuffer: heap error, failed to allocate %i bytes", size);
+        lua_pushfstring(state, "createbuffer: heap error, failed to allocate %d bytes", size);
         lua_error(state);
     }
     buffer->size = size;
@@ -753,7 +753,7 @@ static int api_createvertexshader(lua_State* state) {
     size_t len;
     const char* source = luaL_checklstring(state, 1, &len);
     if (len >= INT_MAX) {
-        lua_pushfstring(state, "createvertexshader: source is too long (%lu bytes, max is %i)", len, source);
+        lua_pushfstring(state, "createvertexshader: source is too long: %d bytes, maximum is %d", len, INT_MAX);
         lua_error(state);
     }
     char buf[ERRORBUFSIZE];
@@ -771,7 +771,7 @@ static int api_createfragmentshader(lua_State* state) {
     size_t len;
     const char* source = luaL_checklstring(state, 1, &len);
     if (len >= INT_MAX) {
-        lua_pushfstring(state, "createfragmentshader: source is too long (%lu bytes, max is %i)", len, source);
+        lua_pushfstring(state, "createfragmentshader: source is too long: %d bytes, maximum is %d", len, INT_MAX);
         lua_error(state);
     }
     char buf[ERRORBUFSIZE];
@@ -841,6 +841,10 @@ static int api_batch2d_targetscale(lua_State* state) {
 static int api_batch2d_vertextargetxy(lua_State* state) {
     const struct RenderBatch2D* batch = require_self_userdata(state, "vertextargetxy");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > batch->index_count) {
+        lua_pushfstring(state, "vertextargetxy: out-of-bounds vertex number: index %d, vertex count is %d", index, batch->index_count);
+        lua_error(state);
+    }
     int32_t xy[2];
     batch->vertex_functions.xy(index - 1, batch->vertex_functions.userdata, xy);
     lua_pushinteger(state, xy[0]);
@@ -851,6 +855,10 @@ static int api_batch2d_vertextargetxy(lua_State* state) {
 static int api_batch2d_vertexscaledxy(lua_State* state) {
     const struct RenderBatch2D* batch = require_self_userdata(state, "vertexscaledxy");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > batch->index_count) {
+        lua_pushfstring(state, "vertexscaledxy: out-of-bounds vertex number: index %d, vertex count is %d", index, batch->index_count);
+        lua_error(state);
+    }
     int32_t xy[2];
     batch->vertex_functions.xy(index - 1, batch->vertex_functions.userdata, xy);
     if (batch->is_interface_scaled) {
@@ -866,6 +874,10 @@ static int api_batch2d_vertexscaledxy(lua_State* state) {
 static int api_batch2d_vertexatlasdetails(lua_State* state) {
     const struct RenderBatch2D* batch = require_self_userdata(state, "vertexatlasxy");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > batch->index_count) {
+        lua_pushfstring(state, "vertexatlasdetails: out-of-bounds vertex number: index %d, vertex count is %d", index, batch->index_count);
+        lua_error(state);
+    }
     int32_t xywh[4];
     uint8_t wrapx, wrapy;
     batch->vertex_functions.atlas_details(index - 1, batch->vertex_functions.userdata, xywh, &wrapx, &wrapy);
@@ -881,6 +893,10 @@ static int api_batch2d_vertexatlasdetails(lua_State* state) {
 static int api_batch2d_vertexuv(lua_State* state) {
     const struct RenderBatch2D* batch = require_self_userdata(state, "vertexuv");
     const lua_Integer index = lua_tointeger(state, 2);
+    if (index < 1 || index > batch->index_count) {
+        lua_pushfstring(state, "vertexuv: out-of-bounds vertex number: index %d, vertex count is %d", index, batch->index_count);
+        lua_error(state);
+    }
     double uv[2];
     uint8_t discard;
     batch->vertex_functions.uv(index - 1, batch->vertex_functions.userdata, uv, &discard);
@@ -897,6 +913,10 @@ static int api_batch2d_vertexuv(lua_State* state) {
 static int api_batch2d_vertexcolour(lua_State* state) {
     const struct RenderBatch2D* batch = require_self_userdata(state, "vertexcolour");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > batch->index_count) {
+        lua_pushfstring(state, "vertexcolour: out-of-bounds vertex number: index %d, vertex count is %d", index, batch->index_count);
+        lua_error(state);
+    }
     double colour[4];
     batch->vertex_functions.colour(index - 1, batch->vertex_functions.userdata, colour);
     lua_pushnumber(state, colour[0]);
@@ -924,11 +944,15 @@ static int api_batch2d_texturesize(lua_State* state) {
 
 static int api_batch2d_texturecompare(lua_State* state) {
     const struct RenderBatch2D* render = require_self_userdata(state, "texturecompare");
-    const size_t x = luaL_checkinteger(state, 2);
-    const size_t y = luaL_checkinteger(state, 3);
+    const lua_Integer x = luaL_checkinteger(state, 2);
+    const lua_Integer y = luaL_checkinteger(state, 3);
     size_t data_len;
     const void* data;
     get_binary_data(state, 4, &data, &data_len);
+    if (x < 0 || y < 0 || (x * 4) + data_len >= (render->tex_width * 4) || y >= render->tex_height) {
+        lua_pushfstring(state, "texturecompare: out-of-bounds section specified: comparing %d bytes at pixel %d,%d in a texture of size %d,%d", data_len, x, y, render->tex_width, render->tex_height);
+        lua_error(state);
+    }
     const uint8_t match = render->texture_functions.compare(render->texture_functions.userdata, x, y, data_len, (const unsigned char*)data);
     lua_pushboolean(state, match);
     return 1;
@@ -939,6 +963,10 @@ static int api_batch2d_texturedata(lua_State* state) {
     const size_t x = luaL_checkinteger(state, 2);
     const size_t y = luaL_checkinteger(state, 3);
     const size_t len = luaL_checkinteger(state, 4);
+    if (x < 0 || y < 0 || (y * render->tex_width + x) * 4 + len > render->tex_width * render->tex_height * 4) {
+        lua_pushfstring(state, "texturedata: out-of-bounds section specified: reading %d bytes at pixel %d,%d in a texture of size %d,%d", len, x, y, render->tex_width, render->tex_height);
+        lua_error(state);
+    }
     const uint8_t* ret = render->texture_functions.data(render->texture_functions.userdata, x, y);
     lua_pushlstring(state, (const char*)ret, len);
     return 1;
@@ -1320,6 +1348,10 @@ static int api_render3d_vertexcount(lua_State* state) {
 static int api_render3d_vertexpoint(lua_State* state) {
     const struct Render3D* render = require_self_userdata(state, "vertexpoint");
     const lua_Integer index = lua_tointeger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexpoint: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
     struct Point3D* point = lua_newuserdata(state, sizeof(struct Point3D));
     render->vertex_functions.xyz(index - 1, render->vertex_functions.userdata, point);
     SETMETATABLE(point)
@@ -1369,6 +1401,10 @@ static int api_render3d_inverseviewmatrix(lua_State* state) {
 static int api_render3d_vertexmeta(lua_State* state) {
     const struct Render3D* render = require_self_userdata(state, "vertexmeta");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexmeta: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
     const size_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
     lua_pushinteger(state, meta);
     return 1;
@@ -1389,6 +1425,10 @@ static int api_render3d_atlasxywh(lua_State* state) {
 static int api_render3d_vertexuv(lua_State* state) {
     const struct Render3D* render = require_self_userdata(state, "vertexuv");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexuv: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
     double uv[4];
     render->vertex_functions.uv(index - 1, render->vertex_functions.userdata, uv);
     lua_pushnumber(state, uv[0]);
@@ -1399,6 +1439,10 @@ static int api_render3d_vertexuv(lua_State* state) {
 static int api_render3d_vertexcolour(lua_State* state) {
     const struct Render3D* render = require_self_userdata(state, "vertexcolour");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexcolour: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
     double col[4];
     render->vertex_functions.colour(index - 1, render->vertex_functions.userdata, col);
     lua_pushnumber(state, col[0]);
@@ -1431,6 +1475,10 @@ static int api_render3d_texturecompare(lua_State* state) {
     size_t data_len;
     const void* data;
     get_binary_data(state, 4, &data, &data_len);
+    if (x < 0 || y < 0 || (x * 4) + data_len >= (render->tex_width * 4) || y >= render->tex_height) {
+        lua_pushfstring(state, "texturecompare: out-of-bounds section specified: comparing %d bytes at pixel %d,%d in a texture of size %d,%d", data_len, x, y, render->tex_width, render->tex_height);
+        lua_error(state);
+    }
     const uint8_t match = render->texture_functions.compare(render->texture_functions.userdata, x, y, data_len, (const unsigned char*)data);
     lua_pushboolean(state, match);
     return 1;
@@ -1441,6 +1489,10 @@ static int api_render3d_texturedata(lua_State* state) {
     const size_t x = luaL_checkinteger(state, 2);
     const size_t y = luaL_checkinteger(state, 3);
     const size_t len = luaL_checkinteger(state, 4);
+    if (x < 0 || y < 0 || (y * render->tex_width + x) * 4 + len > render->tex_width * render->tex_height * 4) {
+        lua_pushfstring(state, "texturedata: out-of-bounds section specified: reading %d bytes at pixel %d,%d in a texture of size %d,%d", len, x, y, render->tex_width, render->tex_height);
+        lua_error(state);
+    }
     const uint8_t* ret = render->texture_functions.data(render->texture_functions.userdata, x, y);
     lua_pushlstring(state, (const char*)ret, len);
     return 1;
@@ -1449,12 +1501,14 @@ static int api_render3d_texturedata(lua_State* state) {
 static int api_render3d_vertexanimation(lua_State* state) {
     const struct Render3D* render = require_self_userdata(state, "vertexanimation");
     const lua_Integer vertex = luaL_checkinteger(state, 2);
-
     if (!render->is_animated) {
-        lua_pushliteral(state, "boneanimation: cannot get bone transforms for non-animated model");
+        lua_pushliteral(state, "vertexanimation: cannot get animation data for non-animated model");
         lua_error(state);
     }
-
+    if (vertex < 1 || vertex > render->vertex_count) {
+        lua_pushfstring(state, "vertexanimation: out-of-bounds vertex number: index %d, vertex count is %d", vertex, render->vertex_count);
+        lua_error(state);
+    }
     struct Transform3D* transform = lua_newuserdata(state, sizeof(struct Transform3D));
     render->vertex_functions.bone_transform(vertex - 1, render->vertex_functions.userdata, transform);
     SETMETATABLE(transform)
@@ -1486,6 +1540,10 @@ static int api_renderparticles_vertexcount(lua_State* state) {
 static int api_renderparticles_vertexparticleorigin(lua_State* state) {
     const struct RenderParticles* render = require_self_userdata(state, "vertexparticleorigin");
     const lua_Integer vertex = luaL_checkinteger(state, 2);
+    if (vertex < 1 || vertex > render->vertex_count) {
+        lua_pushfstring(state, "vertexparticleorigin: out-of-bounds vertex number: index %d, vertex count is %d", vertex, render->vertex_count);
+        lua_error(state);
+    }
     struct Point3D* point = lua_newuserdata(state, sizeof(struct Point3D));
     render->vertex_functions.xyz(vertex - 1, render->vertex_functions.userdata, point);
     SETMETATABLE(point)
@@ -1495,6 +1553,10 @@ static int api_renderparticles_vertexparticleorigin(lua_State* state) {
 static int api_renderparticles_vertexworldoffset(lua_State* state) {
     const struct RenderParticles* render = require_self_userdata(state, "vertexworldoffset");
     const lua_Integer vertex = luaL_checkinteger(state, 2);
+    if (vertex < 1 || vertex > render->vertex_count) {
+        lua_pushfstring(state, "vertexworldoffset: out-of-bounds vertex number: index %d, vertex count is %d", vertex, render->vertex_count);
+        lua_error(state);
+    }
     double offset[3];
     render->vertex_functions.world_offset(vertex - 1, render->vertex_functions.userdata, offset);
     lua_pushnumber(state, offset[0]);
@@ -1506,6 +1568,10 @@ static int api_renderparticles_vertexworldoffset(lua_State* state) {
 static int api_renderparticles_vertexeyeoffset(lua_State* state) {
     const struct RenderParticles* render = require_self_userdata(state, "vertexeyeoffset");
     const lua_Integer vertex = luaL_checkinteger(state, 2);
+    if (vertex < 1 || vertex > render->vertex_count) {
+        lua_pushfstring(state, "vertexeyeoffset: out-of-bounds vertex number: index %d, vertex count is %d", vertex, render->vertex_count);
+        lua_error(state);
+    }
     double offset[2];
     render->vertex_functions.eye_offset(vertex - 1, render->vertex_functions.userdata, offset);
     lua_pushnumber(state, offset[0]);
@@ -1516,6 +1582,10 @@ static int api_renderparticles_vertexeyeoffset(lua_State* state) {
 static int api_renderparticles_vertexuv(lua_State* state) {
     const struct RenderParticles* render = require_self_userdata(state, "vertexuv");
     const lua_Integer vertex = luaL_checkinteger(state, 2);
+    if (vertex < 1 || vertex > render->vertex_count) {
+        lua_pushfstring(state, "vertexuv: out-of-bounds vertex number: index %d, vertex count is %d", vertex, render->vertex_count);
+        lua_error(state);
+    }
     double uv[2];
     render->vertex_functions.uv(vertex - 1, render->vertex_functions.userdata, uv);
     lua_pushnumber(state, uv[0]);
@@ -1526,6 +1596,10 @@ static int api_renderparticles_vertexuv(lua_State* state) {
 static int api_renderparticles_vertexcolour(lua_State* state) {
     const struct RenderParticles* render = require_self_userdata(state, "vertexcolour");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexcolour: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
     double col[4];
     render->vertex_functions.colour(index - 1, render->vertex_functions.userdata, col);
     lua_pushnumber(state, col[0]);
@@ -1538,6 +1612,10 @@ static int api_renderparticles_vertexcolour(lua_State* state) {
 static int api_renderparticles_vertexmeta(lua_State* state) {
     const struct RenderParticles* render = require_self_userdata(state, "vertexmeta");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexmeta: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
     const size_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
     lua_pushinteger(state, meta);
     return 1;
@@ -1578,6 +1656,10 @@ static int api_renderparticles_texturecompare(lua_State* state) {
     size_t data_len;
     const void* data;
     get_binary_data(state, 4, &data, &data_len);
+    if (x < 0 || y < 0 || (x * 4) + data_len >= (render->tex_width * 4) || y >= render->tex_height) {
+        lua_pushfstring(state, "texturecompare: out-of-bounds section specified: comparing %d bytes at pixel %d,%d in a texture of size %d,%d", data_len, x, y, render->tex_width, render->tex_height);
+        lua_error(state);
+    }
     const uint8_t match = render->texture_functions.compare(render->texture_functions.userdata, x, y, data_len, (const unsigned char*)data);
     lua_pushboolean(state, match);
     return 1;
@@ -1588,6 +1670,10 @@ static int api_renderparticles_texturedata(lua_State* state) {
     const size_t x = luaL_checkinteger(state, 2);
     const size_t y = luaL_checkinteger(state, 3);
     const size_t len = luaL_checkinteger(state, 4);
+    if (x < 0 || y < 0 || (y * render->tex_width + x) * 4 + len > render->tex_width * render->tex_height * 4) {
+        lua_pushfstring(state, "texturedata: out-of-bounds section specified: reading %d bytes at pixel %d,%d in a texture of size %d,%d", len, x, y, render->tex_width, render->tex_height);
+        lua_error(state);
+    }
     const uint8_t* ret = render->texture_functions.data(render->texture_functions.userdata, x, y);
     lua_pushlstring(state, (const char*)ret, len);
     return 1;
@@ -1650,6 +1736,10 @@ static int api_renderbillboard_verticesperimage(lua_State* state) {
 static int api_renderbillboard_vertexpoint(lua_State* state) {
     const struct RenderBillboard* render = require_self_userdata(state, "vertexpoint");
     const lua_Integer vertex = luaL_checkinteger(state, 2);
+    if (vertex < 1 || vertex > render->vertex_count) {
+        lua_pushfstring(state, "vertexpoint: out-of-bounds vertex number: index %d, vertex count is %d", vertex, render->vertex_count);
+        lua_error(state);
+    }
     struct Point3D* point = lua_newuserdata(state, sizeof(struct Point3D));
     render->vertex_functions.xyz(vertex - 1, render->vertex_functions.userdata, point);
     SETMETATABLE(point)
@@ -1659,6 +1749,10 @@ static int api_renderbillboard_vertexpoint(lua_State* state) {
 static int api_renderbillboard_vertexeyeoffset(lua_State* state) {
     const struct RenderBillboard* render = require_self_userdata(state, "vertexeyeoffset");
     const lua_Integer vertex = luaL_checkinteger(state, 2);
+    if (vertex < 1 || vertex > render->vertex_count) {
+        lua_pushfstring(state, "vertexeyeoffset: out-of-bounds vertex number: index %d, vertex count is %d", vertex, render->vertex_count);
+        lua_error(state);
+    }
     double offset[2];
     render->vertex_functions.eye_offset(vertex - 1, render->vertex_functions.userdata, offset);
     lua_pushnumber(state, offset[0]);
@@ -1669,6 +1763,10 @@ static int api_renderbillboard_vertexeyeoffset(lua_State* state) {
 static int api_renderbillboard_vertexuv(lua_State* state) {
     const struct RenderBillboard* render = require_self_userdata(state, "vertexuv");
     const lua_Integer vertex = luaL_checkinteger(state, 2);
+    if (vertex < 1 || vertex > render->vertex_count) {
+        lua_pushfstring(state, "vertexuv: out-of-bounds vertex number: index %d, vertex count is %d", vertex, render->vertex_count);
+        lua_error(state);
+    }
     double uv[2];
     render->vertex_functions.uv(vertex - 1, render->vertex_functions.userdata, uv);
     lua_pushnumber(state, uv[0]);
@@ -1679,6 +1777,10 @@ static int api_renderbillboard_vertexuv(lua_State* state) {
 static int api_renderbillboard_vertexmeta(lua_State* state) {
     const struct RenderBillboard* render = require_self_userdata(state, "vertexmeta");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexmeta: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
     const size_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
     lua_pushinteger(state, meta);
     return 1;
@@ -1719,6 +1821,10 @@ static int api_renderbillboard_texturecompare(lua_State* state) {
     size_t data_len;
     const void* data;
     get_binary_data(state, 4, &data, &data_len);
+    if (x < 0 || y < 0 || (x * 4) + data_len >= (render->tex_width * 4) || y >= render->tex_height) {
+        lua_pushfstring(state, "texturecompare: out-of-bounds section specified: comparing %d bytes at pixel %d,%d in a texture of size %d,%d", data_len, x, y, render->tex_width, render->tex_height);
+        lua_error(state);
+    }
     const uint8_t match = render->texture_functions.compare(render->texture_functions.userdata, x, y, data_len, (const unsigned char*)data);
     lua_pushboolean(state, match);
     return 1;
@@ -1729,6 +1835,10 @@ static int api_renderbillboard_texturedata(lua_State* state) {
     const size_t x = luaL_checkinteger(state, 2);
     const size_t y = luaL_checkinteger(state, 3);
     const size_t len = luaL_checkinteger(state, 4);
+    if (x < 0 || y < 0 || (y * render->tex_width + x) * 4 + len > render->tex_width * render->tex_height * 4) {
+        lua_pushfstring(state, "texturedata: out-of-bounds section specified: reading %d bytes at pixel %d,%d in a texture of size %d,%d", len, x, y, render->tex_width, render->tex_height);
+        lua_error(state);
+    }
     const uint8_t* ret = render->texture_functions.data(render->texture_functions.userdata, x, y);
     lua_pushlstring(state, (const char*)ret, len);
     return 1;
@@ -1737,6 +1847,10 @@ static int api_renderbillboard_texturedata(lua_State* state) {
 static int api_renderbillboard_vertexcolour(lua_State* state) {
     const struct RenderBillboard* render = require_self_userdata(state, "vertexcolour");
     const lua_Integer index = luaL_checkinteger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexcolour: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
     double col[4];
     render->vertex_functions.colour(index - 1, render->vertex_functions.userdata, col);
     lua_pushnumber(state, col[0]);
@@ -1813,7 +1927,11 @@ static int api_rendericon_modelcount(lua_State* state) {
 
 static int api_rendericon_modelvertexcount(lua_State* state) {
     const struct RenderIconEvent* event = require_self_userdata(state, "modelvertexcount");
-    const size_t model = luaL_checkinteger(state, 2);
+    const lua_Integer model = luaL_checkinteger(state, 2);
+    if (model < 1 || model > event->icon->model_count) {
+        lua_pushfstring(state, "modelvertexcount: out-of-bounds model number: index %d, model count is %d", model, event->icon->model_count);
+        lua_error(state);
+    }
     lua_pushinteger(state, event->icon->models[model - 1].vertex_count);
     return 1;
 }
@@ -1822,8 +1940,17 @@ static int api_rendericon_modelvertexpoint(lua_State* state) {
     const struct RenderIconEvent* event = require_self_userdata(state, "modelvertexpoint");
     const size_t model = luaL_checkinteger(state, 2);
     const size_t vertex = luaL_checkinteger(state, 3);
+    if (model < 1 || model > event->icon->model_count) {
+        lua_pushfstring(state, "modelvertexpoint: out-of-bounds model number: model %d, model count is %d", model, event->icon->model_count);
+        lua_error(state);
+    }
+    const struct IconModel* icon_model = &event->icon->models[model - 1];
+    if (vertex < 1 || vertex > icon_model->vertex_count) {
+        lua_pushfstring(state, "modelvertexpoint: out-of-bounds vertex number for model %d: vertex %d, vertex count is %d", model, vertex, icon_model->vertex_count);
+        lua_error(state);
+    }
     struct Point3D* point = lua_newuserdata(state, sizeof(struct Point3D));
-    *point = event->icon->models[model - 1].vertices[vertex - 1].point;
+    *point = icon_model->vertices[vertex - 1].point;
     SETMETATABLE(point)
     return 1;
 }
@@ -1832,8 +1959,17 @@ static int api_rendericon_modelvertexcolour(lua_State* state) {
     const struct RenderIconEvent* event = require_self_userdata(state, "modelvertexcolour");
     const size_t model = luaL_checkinteger(state, 2);
     const size_t vertex = luaL_checkinteger(state, 3);
+    if (model < 1 || model > event->icon->model_count) {
+        lua_pushfstring(state, "modelvertexcolour: out-of-bounds model number: index %d, model count is %d", model, event->icon->model_count);
+        lua_error(state);
+    }
+    const struct IconModel* icon_model = &event->icon->models[model - 1];
+    if (vertex < 1 || vertex > icon_model->vertex_count) {
+        lua_pushfstring(state, "modelvertexcolour: out-of-bounds vertex number for model %d: vertex %d, vertex count is %d", model, vertex, icon_model->vertex_count);
+        lua_error(state);
+    }
     for (size_t i = 0; i < 4; i += 1) {
-        lua_pushnumber(state, event->icon->models[model - 1].vertices[vertex - 1].rgba[i]);
+        lua_pushnumber(state, icon_model->vertices[vertex - 1].rgba[i]);
     }
     return 4;
 }
@@ -1856,6 +1992,10 @@ static int api_rendericon_targetsize(lua_State* state) {
 static int api_rendericon_modelmodelmatrix(lua_State* state) {
     const struct RenderIconEvent* event = require_self_userdata(state, "modelmodelmatrix");
     const size_t model = luaL_checkinteger(state, 2);
+    if (model < 1 || model > event->icon->model_count) {
+        lua_pushfstring(state, "modelmodelmatrix: out-of-bounds model number: index %d, model count is %d", model, event->icon->model_count);
+        lua_error(state);
+    }
     struct Transform3D* transform = lua_newuserdata(state, sizeof(struct Transform3D));
     *transform = event->icon->models[model - 1].model_matrix;
     SETMETATABLE(transform)
@@ -1865,6 +2005,10 @@ static int api_rendericon_modelmodelmatrix(lua_State* state) {
 static int api_rendericon_modelviewmatrix(lua_State* state) {
     const struct RenderIconEvent* event = require_self_userdata(state, "modelviewmatrix");
     const size_t model = luaL_checkinteger(state, 2);
+    if (model < 1 || model > event->icon->model_count) {
+        lua_pushfstring(state, "modelviewmatrix: out-of-bounds model number: index %d, model count is %d", model, event->icon->model_count);
+        lua_error(state);
+    }
     struct Transform3D* transform = lua_newuserdata(state, sizeof(struct Transform3D));
     *transform = event->icon->models[model - 1].view_matrix;
     SETMETATABLE(transform)
@@ -1874,6 +2018,10 @@ static int api_rendericon_modelviewmatrix(lua_State* state) {
 static int api_rendericon_modelprojmatrix(lua_State* state) {
     const struct RenderIconEvent* event = require_self_userdata(state, "modelprojmatrix");
     const size_t model = luaL_checkinteger(state, 2);
+    if (model < 1 || model > event->icon->model_count) {
+        lua_pushfstring(state, "modelprojmatrix: out-of-bounds model number: index %d, model count is %d", model, event->icon->model_count);
+        lua_error(state);
+    }
     struct Transform3D* transform = lua_newuserdata(state, sizeof(struct Transform3D));
     *transform = event->icon->models[model - 1].projection_matrix;
     SETMETATABLE(transform)
@@ -1883,6 +2031,10 @@ static int api_rendericon_modelprojmatrix(lua_State* state) {
 static int api_rendericon_modelviewprojmatrix(lua_State* state) {
     const struct RenderIconEvent* event = require_self_userdata(state, "modelviewprojmatrix");
     const size_t model = luaL_checkinteger(state, 2);
+    if (model < 1 || model > event->icon->model_count) {
+        lua_pushfstring(state, "modelviewprojmatrix: out-of-bounds model number: index %d, model count is %d", model, event->icon->model_count);
+        lua_error(state);
+    }
     struct Transform3D* transform = lua_newuserdata(state, sizeof(struct Transform3D));
     *transform = event->icon->models[model - 1].viewproj_matrix;
     SETMETATABLE(transform)
@@ -2103,7 +2255,7 @@ static int api_buffer_setstring(lua_State* state) {
     size_t size;
     const void* data = luaL_checklstring(state, 3, &size);
     if (offset < 0 || (offset + size) > buffer->size) {
-        lua_pushfstring(state, "buffer setstring: out-of-bounds write (buffer length %lu, writing %lu bytes at %li)", buffer->size, size, offset);
+        lua_pushfstring(state, "buffer setstring: out-of-bounds write (buffer length %d, writing %d bytes at offset %d)", buffer->size, size, offset);
         lua_error(state);
     }
     memcpy((uint8_t*)buffer->data + offset, data, size);
@@ -2115,7 +2267,7 @@ static int api_buffer_setbuffer(lua_State* state) {
     const long offset = luaL_checklong(state, 2);
     const struct FixedBuffer* srcbuffer = require_userdata(state, 3, "setbuffer");
     if (offset < 0 || (offset + srcbuffer->size) > buffer->size) {
-        lua_pushfstring(state, "buffer setbuffer: out-of-bounds write (buffer length %lu, writing %lu bytes at %li)", buffer->size, srcbuffer->size, offset);
+        lua_pushfstring(state, "buffer setbuffer: out-of-bounds write (buffer length %d, writing %d bytes at offset %d)", buffer->size, srcbuffer->size, offset);
         lua_error(state);
     }
     memcpy((uint8_t*)buffer->data + offset, srcbuffer->data, srcbuffer->size);
@@ -2134,7 +2286,7 @@ static int api_swapbuffers_readpixels(lua_State* state) {
     struct FixedBuffer* buffer = lua_newuserdata(state, sizeof(struct FixedBuffer));
     buffer->data = malloc(size);
     if (!buffer->data) {
-        lua_pushfstring(state, "readpixels: heap error, failed to allocate %i bytes", size);
+        lua_pushfstring(state, "readpixels: heap error, failed to allocate %d bytes", size);
         lua_error(state);
     }
     buffer->size = size;
@@ -2163,7 +2315,7 @@ static int api_shaderprogram_setattribute(lua_State* state) {
     struct ShaderProgramFunctions* program = require_self_userdata(state, "setattribute");
     const lua_Integer attribute = luaL_checkinteger(state, 2);
     if (attribute < 0 || attribute >= MAX_PROGRAM_BINDINGS) {
-        lua_pushfstring(state, "setattribute: invalid attribute %li - must be positive and less than %i", attribute, MAX_PROGRAM_BINDINGS);
+        lua_pushfstring(state, "setattribute: invalid attribute %d - must be positive and less than %d", attribute, MAX_PROGRAM_BINDINGS);
         lua_error(state);
     }
     const uint8_t width = luaL_checkinteger(state, 3);
@@ -2173,7 +2325,7 @@ static int api_shaderprogram_setattribute(lua_State* state) {
     const lua_Integer offset = luaL_checkinteger(state, 7);
     const lua_Integer stride = luaL_checkinteger(state, 8);
     if (!program->set_attribute(program->userdata, (uint8_t)attribute, width, is_signed, is_float, size, (uint32_t)offset, (uint32_t)stride)) {
-        lua_pushfstring(state, "setattribute: invalid arguments or attribute is already enabled", attribute, MAX_PROGRAM_BINDINGS);
+        lua_pushliteral(state, "setattribute: invalid arguments or attribute is already enabled");
         lua_error(state);
     }
     return 0;
@@ -2247,7 +2399,7 @@ static int api_shaderprogram_drawtosurface(lua_State* state) {
     const struct ShaderBufferFunctions* buffer = require_userdata(state, 3, "drawtosurface");
     const lua_Integer vertex_count = luaL_checkinteger(state, 4);
     if (vertex_count > UINT32_MAX) {
-        lua_pushfstring(state, "drawtosurface: too many vertices: %lu, maximum is %u", vertex_count, UINT32_MAX);
+        lua_pushfstring(state, "drawtosurface: too many vertices: %d, maximum is %d", vertex_count, UINT32_MAX);
         lua_error(state);
     }
     program->draw_to_surface(program->userdata, surface->userdata, buffer->userdata, vertex_count);
@@ -2260,7 +2412,7 @@ static int api_shaderprogram_drawtogameview(lua_State* state) {
     const struct ShaderBufferFunctions* buffer = require_userdata(state, 3, "drawtogameview");
     const lua_Integer vertex_count = luaL_checkinteger(state, 4);
     if (vertex_count > UINT32_MAX) {
-        lua_pushfstring(state, "drawtogameview: too many vertices: %lu, maximum is %u", vertex_count, UINT32_MAX);
+        lua_pushfstring(state, "drawtogameview: too many vertices: %d, maximum is %d", vertex_count, UINT32_MAX);
         lua_error(state);
     }
     program->draw_to_gameview(program->userdata, gameview->functions.userdata, buffer->userdata, vertex_count);
