@@ -39,6 +39,11 @@
       "inherits": ["common-gcc"],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
@@ -48,6 +53,11 @@
       "inherits": ["common-gcc"],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
@@ -57,6 +67,11 @@
       "inherits": ["common-clang"],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
@@ -66,6 +81,11 @@
       "inherits": ["common-clang"],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
@@ -76,6 +96,11 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "BOLT_SKIP_LIBRARIES": "1"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
@@ -86,6 +111,11 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "BOLT_SKIP_LIBRARIES": "1"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
@@ -97,6 +127,49 @@
         "CMAKE_BUILD_TYPE": "Release",
         "BOLT_DEV_SHOW_DEVTOOLS": "1",
         "BOLT_DEV_LAUNCHER_DIRECTORY": "1"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "release-msvc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BOLT_DEV_SHOW_DEVTOOLS": "1",
+        "BOLT_DEV_LAUNCHER_DIRECTORY": "1",
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "release-msvc-skip-libs",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BOLT_SKIP_LIBRARIES": "1"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "msvc-app",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BOLT_DEV_SHOW_DEVTOOLS": "1",
+        "BOLT_DEV_LAUNCHER_DIRECTORY": "1"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     }
   ],
@@ -141,6 +214,24 @@
       "name": "clang-app",
       "displayName": "Build Clang: Frontend with DevTools",
       "configurePreset": "clang-app",
+      "targets": ["install"]
+    },
+    {
+      "name": "release-msvc",
+      "displayName": "Build Release MSVC",
+      "configurePreset": "release-msvc",
+      "targets": ["install"]
+    },
+    {
+      "name": "release-msvc-skip-libs",
+      "displayName": "Build Release MSVC: Skip Libs",
+      "configurePreset": "release-msvc-skip-libs",
+      "targets": ["install"]
+    },    
+    {
+      "name": "msvc-app",
+      "displayName": "Build MSVC: Frontend with DevTools",
+      "configurePreset": "msvc-app",
       "targets": ["install"]
     }
   ]
