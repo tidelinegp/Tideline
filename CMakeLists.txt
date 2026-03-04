@@ -485,6 +485,7 @@ add_executable("${BOLT_EXE_NAME}"
     "${LIBRARY_IPC_OS_SPECIFIC}" ${BOLT_FILE_MANAGER_LAUNCHER_GEN} ${BOLT_STUB_INJECT_CXX}
     src/browser/window_osr.cxx src/browser/window_plugin.cxx src/browser/window_plugin_requests.cxx
     src/browser/request.cxx
+	icon/bolt.rc
 )
 if(BOLT_STUB_INJECT_CXX)
     add_dependencies("${BOLT_EXE_NAME}" BOLT_STUB_INJECT_DEPENDENCY)
