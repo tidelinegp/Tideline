@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "x.h"
 #include "sdl.h"
@@ -103,7 +102,8 @@ static ElfW(Word) _bolt_hash_elf(const char* name) {
 
 	while ((c = *uname++) != '\0') {
 		hash = (hash << 4) + c;
-		if ((tmp = (hash & 0xf0000000)) != 0) {
+        tmp = hash & 0xf0000000;
+		if (tmp != 0) {
 			hash ^= tmp >> 24;
 			hash ^= tmp;
 		}
@@ -132,7 +132,7 @@ static const ElfW(Sym)* _bolt_lookup_symbol(const char* symbol_name, const Elf32
         const Elf32_Word bitmask_idxbits = bitmask_nwords - 1;
         const Elf32_Word shift = gnu_hash_table[3];
         const ElfW(Addr)* bitmask = (ElfW(Addr)*)&gnu_hash_table[4];
-        const Elf32_Word* buckets = &gnu_hash_table[4 + (__ELF_NATIVE_CLASS / 32) * bitmask_nwords];
+        const Elf32_Word* buckets = &gnu_hash_table[4 + ((__ELF_NATIVE_CLASS / 32) * bitmask_nwords)];
         const Elf32_Word* chain_zero = &buckets[nbuckets] - symbias;
 
         Elf32_Word hash = _bolt_hash_gnu(symbol_name);
@@ -561,7 +561,7 @@ static uint8_t handle_buttonrelease_event(int16_t x, int16_t y, uint32_t detail,
             size_t iter = 0;
             void* item;
             while (hashmap_iter(windows->map, &iter, &item)) {
-                struct EmbeddedWindow** window = item;
+                struct EmbeddedWindow** window = (struct EmbeddedWindow**)item;
                 _bolt_rwlock_lock_read(&(*window)->lock);
                 const uint8_t in_window = point_in_rect(x, y, (*window)->metadata.x, (*window)->metadata.y, (*window)->metadata.width, (*window)->metadata.height);
                 _bolt_rwlock_unlock_read(&(*window)->lock);
@@ -580,15 +580,15 @@ static uint8_t handle_mouseleave_event(int16_t x, int16_t y, uint16_t state) {
     _bolt_rwlock_lock_read(&windows->lock);
     const uint64_t p = _bolt_plugin_get_last_mouseevent_windowid();
     const uint64_t* pp = &p;
-    struct EmbeddedWindow* const* window = hashmap_get(windows->map, &pp);
+    struct EmbeddedWindow* const* window = (struct EmbeddedWindow* const*)hashmap_get(windows->map, (const void*)&pp);
     if (window) {
         _bolt_rwlock_lock_read(&(*window)->lock);
-        const int16_t wx = (*window)->metadata.x;
-        const int16_t wy = (*window)->metadata.y;
+        const int16_t wx = (int16_t)(*window)->metadata.x;
+        const int16_t wy = (int16_t)(*window)->metadata.y;
         _bolt_rwlock_unlock_read(&(*window)->lock);
         _bolt_rwlock_lock_write(&(*window)->input_lock);
         (*window)->input.mouse_leave = 1;
-        _bolt_mouseevent_from_xcb(x - wx, y - wy, state, &(*window)->input.mouse_leave_event);
+        _bolt_mouseevent_from_xcb((int16_t)(x - wx), (int16_t)(y - wy), state, &(*window)->input.mouse_leave_event);
         _bolt_rwlock_unlock_write(&(*window)->input_lock);
     }
     _bolt_rwlock_unlock_read(&windows->lock);
@@ -623,27 +623,27 @@ static uint8_t _bolt_handle_xcb_event(xcb_connection_t* c, xcb_generic_event_t* 
                 case XCB_INPUT_BUTTON_PRESS: { // when pressing a mouse button that's received by the game window
                     const xcb_input_button_press_event_t* event = (xcb_input_button_press_event_t*)e;
                     if (event->event != main_window_xcb) return true;
-                    return handle_buttonpress_event(event->event_x >> 16, event->event_y >> 16, event->detail, event->mods.effective);
+                    return handle_buttonpress_event((int16_t)(event->event_x >> 16), (int16_t)(event->event_y >> 16), event->detail, event->mods.effective);
                 }
                 case XCB_INPUT_BUTTON_RELEASE: { // when releasing a mouse button that's received by the game window
                     const xcb_input_button_release_event_t* event = (xcb_input_button_release_event_t*)e;
                     if (event->event != main_window_xcb) return true;
-                    return handle_buttonrelease_event(event->event_x >> 16, event->event_y >> 16, event->detail, event->mods.effective);
+                    return handle_buttonrelease_event((int16_t)(event->event_x >> 16), (int16_t)(event->event_y >> 16), event->detail, event->mods.effective);
                 }
                 case XCB_INPUT_MOTION: { // when mouse moves inside the game window
                     const xcb_input_motion_event_t* event = (xcb_input_motion_event_t*)e;
                     if (event->event != main_window_xcb) return true;
-                    return handle_mouse_event(event->event_x >> 16, event->event_y >> 16, event->mods.effective, offsetof(struct WindowPendingInput, mouse_motion), offsetof(struct WindowPendingInput, mouse_motion_event), GRAB_TYPE_NONE);
+                    return handle_mouse_event((int16_t)(event->event_x >> 16), (int16_t)(event->event_y >> 16), event->mods.effective, offsetof(struct WindowPendingInput, mouse_motion), offsetof(struct WindowPendingInput, mouse_motion_event), GRAB_TYPE_NONE);
                 }
                 case XCB_INPUT_ENTER: { // when mouse moves into this window, having previously been in another window
                     const xcb_input_enter_event_t* event = (xcb_input_enter_event_t*)e;
                     if (event->event != main_window_xcb) return true;
-                    return handle_mouse_event(event->event_x >> 16, event->event_y >> 16, event->mods.effective, offsetof(struct WindowPendingInput, mouse_motion), offsetof(struct WindowPendingInput, mouse_motion_event), GRAB_TYPE_NONE);
+                    return handle_mouse_event((int16_t)(event->event_x >> 16), (int16_t)(event->event_y >> 16), event->mods.effective, offsetof(struct WindowPendingInput, mouse_motion), offsetof(struct WindowPendingInput, mouse_motion_event), GRAB_TYPE_NONE);
                 }
                 case XCB_INPUT_LEAVE: { // when mouse moves into another window, having previously been in this window
                     const xcb_input_leave_event_t* event = (xcb_input_leave_event_t*)e;
                     if (event->event != main_window_xcb) return true;
-                    return handle_mouseleave_event(event->event_x >> 16, event->event_y >> 16, event->mods.effective);
+                    return handle_mouseleave_event((int16_t)(event->event_x >> 16), (int16_t)(event->event_y >> 16), event->mods.effective);
                 }
                 case XCB_INPUT_RAW_MOTION: // when mouse moves anywhere globally on the PC
                 case XCB_INPUT_RAW_BUTTON_PRESS: // when pressing a mouse button anywhere globally on the PC
@@ -817,11 +817,6 @@ void* SDL_CreateWindow(const char* title, int x, int y, int w, int h, SDL_Window
     LOGF("SDL_CreateWindow end -> %lu\n", (uintptr_t)ret);
     return ret;
 }
-
-void* dlopen(const char*, int);
-void* dlsym(void*, const char*);
-void* dlvsym(void*, const char*, const char*);
-int dlclose(void*);
 
 static void* _bolt_dl_lookup(void* handle, const char* symbol) {
     if (!handle) return NULL;

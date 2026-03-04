@@ -81,7 +81,7 @@ struct Vertex3DFunctions {
     void (*xyz)(size_t index, void* userdata, struct Point3D* out);
 
     /// Returns a meta-ID for the texture associated with this vertex.
-    size_t (*atlas_meta)(size_t index, void* userdata);
+    uint32_t (*atlas_meta)(size_t index, void* userdata);
 
     /// Returns the XYWH of the texture image referred to by this meta-ID, in pixel coordinates.
     void (*atlas_xywh)(size_t meta, void* userdata, int32_t* out);
@@ -118,7 +118,7 @@ struct VertexParticleFunctions {
     void (*uv)(size_t index, void* userdata, double* out);
     
     /// Returns a meta-ID for the texture associated with this vertex.
-    size_t (*atlas_meta)(size_t index, void* userdata);
+    uint32_t (*atlas_meta)(size_t index, void* userdata);
 
     /// Returns the XYWH of the texture image referred to by this meta-ID, in pixel coordinates.
     void (*atlas_xywh)(size_t meta, void* userdata, int32_t* out);
@@ -144,7 +144,7 @@ struct VertexBillboardFunctions {
     void (*uv)(size_t index, void* userdata, double* out);
     
     /// Returns a meta-ID for the texture associated with this vertex.
-    size_t (*atlas_meta)(size_t index, void* userdata);
+    uint32_t (*atlas_meta)(size_t index, void* userdata);
 
     /// Returns the XYWH of the texture image referred to by this meta-ID, in pixel coordinates.
     void (*atlas_xywh)(size_t meta, void* userdata, int32_t* out);
@@ -181,7 +181,7 @@ struct TextureFunctions {
     void* userdata;
 
     /// Returns the ID for the associated texture object.
-    size_t (*id)(void* userdata);
+    unsigned int (*id)(void* userdata);
 
     /// Returns the size of this texture atlas in pixels.
     void (*size)(void* userdata, size_t* out);
@@ -271,13 +271,13 @@ struct ShaderProgramFunctions {
     void (*draw_to_gameview)(void* userdata, void* event_userdata, void* buffer, uint32_t count);
 
     /// Associates some values with a uniform in this shader program by its location.
-    void (*set_uniform_floats)(void* userdata, int location, uint8_t count, double* values);
+    void (*set_uniform_floats)(void* userdata, int location, uint8_t count, const double* values);
 
     /// Associates some values with a uniform in this shader program by its location.
-    void (*set_uniform_ints)(void* userdata, int location, uint8_t count, int* values);
+    void (*set_uniform_ints)(void* userdata, int location, uint8_t count, const int* values);
 
     /// Associates some values with a uniform in this shader program by its location.
-    void (*set_uniform_matrix)(void* userdata, int location, uint8_t transpose, uint8_t size, double* values);
+    void (*set_uniform_matrix)(void* userdata, int location, uint8_t transpose, uint8_t size, const double* values);
 
     /// Associates a surface userdata object with a uniform in this shader program by its location.
     /// Typically this will be used for a sampler2D variable.

@@ -30,7 +30,7 @@ struct FixedBuffer {
 
 static void set_handler(lua_State* state, const char* regname, uint64_t window_id, int ev) {
     lua_getfield(state, LUA_REGISTRYINDEX, regname); /*stack: window table*/ \
-    lua_pushinteger(state, window_id); /*stack: window table, window id*/ \
+    lua_pushinteger(state, (lua_Integer)window_id); /*stack: window table, window id*/ \
     lua_gettable(state, -2); /*stack: window table, event table*/ \
     lua_pushinteger(state, ev); /*stack: window table, event table, event id*/ \
     if (lua_isfunction(state, 2)) { \
@@ -133,6 +133,12 @@ static int shaderbuffer_gc(lua_State* state) {
     const struct ShaderBufferFunctions* buffer = lua_touserdata(state, 1);
     managed_functions->shader_buffer_destroy(buffer->userdata);
     return 0;
+}
+
+#define BOUNDCHECK(L, VAL, MIN, MAX, FNAME, PNAME) \
+if ((VAL) < (MIN) || (VAL) > (MAX)) { \
+    lua_pushfstring(L, #FNAME ": " #PNAME " %d is outside the range %d,%d", (VAL), (MIN), (MAX)); \
+    lua_error(L); \
 }
 
 /* macros that generate handlers for Buffer objects */
@@ -258,7 +264,9 @@ static int api_close(lua_State* state) {
 static int api_time(lua_State* state) {
     uint64_t micros;
     if (_bolt_monotonic_microseconds(&micros)) {
-        lua_pushinteger(state, micros);
+        // note: this narrowing cast is not particularly safe on architectures below 64-bit,
+        // but this is documented in `bolt.time()` docs and there's not a lot I can do about it.
+        lua_pushinteger(state, (lua_Integer)micros);
     } else {
         lua_pushnil(state);
     }
@@ -340,7 +348,7 @@ static int api_isfocused(lua_State* state) {
 
 static int api_characterid(lua_State* state) {
     const char* hash = _bolt_plugin_character_hash();
-    lua_pushlstring(state, hash, CHARHASHSIZE);
+    lua_pushlstring(state, hash, (size_t)CHARHASHSIZE);
     return 1;
 }
 
@@ -496,7 +504,7 @@ static int api_createsurfacefrompng(lua_State* state) {
     memcpy(full_path + plugin->path_length + path_length, extension, sizeof(extension));
     FILE* f = fopen(full_path, "rb");
     if (!f) {
-        printf("createsurfacefrompng: error opening file '%s'\n", (char*)full_path);
+        printf("createsurfacefrompng: error opening file '%s'\n", full_path);
         return 0;
     }
     fseek(f, 0, SEEK_END);
@@ -506,7 +514,7 @@ static int api_createsurfacefrompng(lua_State* state) {
     const size_t read_count = fread(png, 1, png_size, f);
     fclose(f);
     if (read_count < png_size) {
-        printf("createsurfacefrompng: error reading file '%s'\n", (char*)full_path);
+        printf("createsurfacefrompng: error reading file '%s'\n", full_path);
         return 0;
     }
 
@@ -535,6 +543,14 @@ static int api_createsurfacefrompng(lua_State* state) {
 
 static int api_createwindow(lua_State* state) {
     const struct PluginManagedFunctions* managed_functions = _bolt_plugin_managed_functions();
+    const lua_Integer x = luaL_checkinteger(state, 1);
+    const lua_Integer y = luaL_checkinteger(state, 2);
+    const lua_Integer w = luaL_checkinteger(state, 3);
+    const lua_Integer h = luaL_checkinteger(state, 4);
+    if (x < INT_MIN || x > INT_MAX || y < INT_MIN || y > INT_MAX || w < 0 || w > INT_MAX || h < 0 || h > INT_MAX) {
+        lua_pushfstring(state, "createwindow: invalid dimensions: %d,%d, %dx%d", x, y, w, h);
+        lua_error(state);
+    }
     lua_getfield(state, LUA_REGISTRYINDEX, PLUGIN_REGISTRYNAME);
     const struct Plugin* plugin = lua_touserdata(state, -1);
     lua_pop(state, 1);
@@ -551,10 +567,10 @@ static int api_createwindow(lua_State* state) {
     window->plugin = state;
     _bolt_rwlock_init(&window->lock);
     _bolt_rwlock_init(&window->input_lock);
-    window->metadata.x = luaL_checkinteger(state, 1);
-    window->metadata.y = luaL_checkinteger(state, 2);
-    window->metadata.width = luaL_checkinteger(state, 3);
-    window->metadata.height = luaL_checkinteger(state, 4);
+    window->metadata.x = (int)x;
+    window->metadata.y = (int)y;
+    window->metadata.width = (int)w;
+    window->metadata.height = (int)h;
     window->last_user_action_metadata = window->metadata;
     if (window->metadata.width < WINDOW_MIN_SIZE) window->metadata.width = WINDOW_MIN_SIZE;
     if (window->metadata.height < WINDOW_MIN_SIZE) window->metadata.height = WINDOW_MIN_SIZE;
@@ -564,7 +580,7 @@ static int api_createwindow(lua_State* state) {
 
     // create an event table in the registry for this window
     lua_getfield(state, LUA_REGISTRYINDEX, WINDOWS_REGISTRYNAME);
-    lua_pushinteger(state, window->id);
+    lua_pushinteger(state, (lua_Integer)window->id);
     lua_createtable(state, WINDOW_EVENT_ENUM_SIZE, 0);
     lua_pushinteger(state, WINDOW_USERDATA);
     lua_pushvalue(state, -5);
@@ -575,14 +591,18 @@ static int api_createwindow(lua_State* state) {
     // set this window in the hashmap, which is accessible by backends
     struct WindowInfo* windows = _bolt_plugin_windowinfo();
     _bolt_rwlock_lock_write(&windows->lock);
-    hashmap_set(windows->map, &window);
+    hashmap_set(windows->map, (const void*)&window);
     _bolt_rwlock_unlock_write(&windows->lock);
     return 1;
 }
 
 static int api_createbrowser(lua_State* state) {
-    const int w = luaL_checkinteger(state, 1);
-    const int h = luaL_checkinteger(state, 2);
+    const lua_Integer w = luaL_checkinteger(state, 1);
+    const lua_Integer h = luaL_checkinteger(state, 2);
+    if (w < 0 || w > INT_MAX || h < 0 || h > INT_MAX) {
+        lua_pushfstring(state, "createbrowser: invalid dimensions: %dx%d", w, h);
+        lua_error(state);
+    }
     size_t url_length;
     const char* url = luaL_checklstring(state, 3, &url_length);
     const char* custom_js = NULL;
@@ -605,7 +625,7 @@ static int api_createbrowser(lua_State* state) {
 
     // create an empty event table in the registry for this window
     lua_getfield(state, LUA_REGISTRYINDEX, BROWSERS_REGISTRYNAME);
-    lua_pushinteger(state, browser->id);
+    lua_pushinteger(state, (lua_Integer)browser->id);
     lua_createtable(state, BROWSER_EVENT_ENUM_SIZE, 0);
     lua_settable(state, -3);
     lua_pop(state, 1);
@@ -618,8 +638,8 @@ static int api_createbrowser(lua_State* state) {
         .window_id = browser->id,
         .url_length = url_length,
         .pid = pid,
-        .w = w,
-        .h = h,
+        .w = (int)w,
+        .h = (int)h,
         .has_custom_js = custom_js != NULL,
         .custom_js_length = len,
     };
@@ -631,15 +651,19 @@ static int api_createbrowser(lua_State* state) {
     if (custom_js) _bolt_ipc_send(fd, custom_js, len);
 
     // add to the hashmap
-    hashmap_set(plugin->external_browsers, &browser);
+    hashmap_set(plugin->external_browsers, (const void*)&browser);
     return 1;
 }
 
 static int api_createembeddedbrowser(lua_State* state) {
-    const int x = luaL_checkinteger(state, 1);
-    const int y = luaL_checkinteger(state, 2);
-    const int w = luaL_checkinteger(state, 3);
-    const int h = luaL_checkinteger(state, 4);
+    const lua_Integer x = luaL_checkinteger(state, 1);
+    const lua_Integer y = luaL_checkinteger(state, 2);
+    const lua_Integer w = luaL_checkinteger(state, 3);
+    const lua_Integer h = luaL_checkinteger(state, 4);
+    if (x < INT_MIN || x > INT_MAX || y < INT_MIN || y > INT_MAX || w < 0 || w > INT_MAX || h < 0 || h > INT_MAX) {
+        lua_pushfstring(state, "createembeddedbrowser: invalid dimensions: %d,%d, %dx%d", x, y, w, h);
+        lua_error(state);
+    }
     size_t url_length;
     const char* url = luaL_checklstring(state, 5, &url_length);
     const char* custom_js = NULL;
@@ -674,10 +698,10 @@ static int api_createembeddedbrowser(lua_State* state) {
     window->plugin = state;
     _bolt_rwlock_init(&window->lock);
     _bolt_rwlock_init(&window->input_lock);
-    window->metadata.x = x;
-    window->metadata.y = y;
-    window->metadata.width = w;
-    window->metadata.height = h;
+    window->metadata.x = (int)x;
+    window->metadata.y = (int)y;
+    window->metadata.width = (int)w;
+    window->metadata.height = (int)h;
     window->last_user_action_metadata = window->metadata;
     if (window->metadata.width < WINDOW_MIN_SIZE) window->metadata.width = WINDOW_MIN_SIZE;
     if (window->metadata.height < WINDOW_MIN_SIZE) window->metadata.height = WINDOW_MIN_SIZE;
@@ -687,7 +711,7 @@ static int api_createembeddedbrowser(lua_State* state) {
 
     // create an event table in the registry for this window
     lua_getfield(state, LUA_REGISTRYINDEX, BROWSERS_REGISTRYNAME);
-    lua_pushinteger(state, window->id);
+    lua_pushinteger(state, (lua_Integer)window->id);
     lua_createtable(state, BROWSER_EVENT_ENUM_SIZE, 0);
     lua_pushinteger(state, BROWSER_USERDATA);
     lua_pushvalue(state, -5);
@@ -718,7 +742,7 @@ static int api_createembeddedbrowser(lua_State* state) {
     // set this window in the hashmap, which is accessible by backends
     struct WindowInfo* windows = _bolt_plugin_windowinfo();
     _bolt_rwlock_lock_write(&windows->lock);
-    hashmap_set(windows->map, &window);
+    hashmap_set(windows->map, (const void*)&window);
     _bolt_rwlock_unlock_write(&windows->lock);
     return 1;
 }
@@ -758,7 +782,7 @@ static int api_createvertexshader(lua_State* state) {
     }
     char buf[ERRORBUFSIZE];
     struct ShaderFunctions* shader = lua_newuserdata(state, sizeof(struct ShaderFunctions));
-    if (!functions->vertex_shader_init(shader, source, len, buf, ERRORBUFSIZE)) {
+    if (!functions->vertex_shader_init(shader, source, (int)len, buf, ERRORBUFSIZE)) {
         lua_pushfstring(state, "createvertexshader: shader compilation error: %s", buf);
         lua_error(state);
     }
@@ -776,7 +800,7 @@ static int api_createfragmentshader(lua_State* state) {
     }
     char buf[ERRORBUFSIZE];
     struct ShaderFunctions* shader = lua_newuserdata(state, sizeof(struct ShaderFunctions));
-    if (!functions->fragment_shader_init(shader, source, len, buf, ERRORBUFSIZE)) {
+    if (!functions->fragment_shader_init(shader, source, (int)len, buf, ERRORBUFSIZE)) {
         lua_pushfstring(state, "createfragmentshader: shader compilation error: %s", buf);
         lua_error(state);
     }
@@ -862,8 +886,8 @@ static int api_batch2d_vertexscaledxy(lua_State* state) {
     int32_t xy[2];
     batch->vertex_functions.xy(index - 1, batch->vertex_functions.userdata, xy);
     if (batch->is_interface_scaled) {
-        lua_pushnumber(state, xy[0] * batch->interface_scale);
-        lua_pushnumber(state, xy[1] * batch->interface_scale);
+        lua_pushnumber(state, (double)xy[0] * (double)batch->interface_scale);
+        lua_pushnumber(state, (double)xy[1] * (double)batch->interface_scale);
     } else {
         lua_pushinteger(state, xy[0]);
         lua_pushinteger(state, xy[1]);
@@ -928,7 +952,7 @@ static int api_batch2d_vertexcolour(lua_State* state) {
 
 static int api_batch2d_textureid(lua_State* state) {
     const struct RenderBatch2D* render = require_self_userdata(state, "textureid");
-    const size_t id = render->texture_functions.id(render->texture_functions.userdata);
+    const unsigned int id = render->texture_functions.id(render->texture_functions.userdata);
     lua_pushinteger(state, id);
     return 1;
 }
@@ -937,8 +961,8 @@ static int api_batch2d_texturesize(lua_State* state) {
     const struct RenderBatch2D* render = require_self_userdata(state, "texturesize");
     size_t size[2];
     render->texture_functions.size(render->texture_functions.userdata, size);
-    lua_pushinteger(state, size[0]);
-    lua_pushinteger(state, size[1]);
+    lua_pushinteger(state, (lua_Integer)size[0]);
+    lua_pushinteger(state, (lua_Integer)size[1]);
     return 2;
 }
 
@@ -949,7 +973,7 @@ static int api_batch2d_texturecompare(lua_State* state) {
     size_t data_len;
     const void* data;
     get_binary_data(state, 4, &data, &data_len);
-    if (x < 0 || y < 0 || (x * 4) + data_len >= (render->tex_width * 4) || y >= render->tex_height) {
+    if (x < 0 || y < 0 || (x * 4) + data_len >= ((size_t)render->tex_width * 4) || y >= render->tex_height) {
         lua_pushfstring(state, "texturecompare: out-of-bounds section specified: comparing %d bytes at pixel %d,%d in a texture of size %d,%d", data_len, x, y, render->tex_width, render->tex_height);
         lua_error(state);
     }
@@ -963,7 +987,7 @@ static int api_batch2d_texturedata(lua_State* state) {
     const size_t x = luaL_checkinteger(state, 2);
     const size_t y = luaL_checkinteger(state, 3);
     const size_t len = luaL_checkinteger(state, 4);
-    if (x < 0 || y < 0 || (y * render->tex_width + x) * 4 + len > render->tex_width * render->tex_height * 4) {
+    if (x < 0 || y < 0 || ((y * render->tex_width + x) * 4) + len > (size_t)render->tex_width * (size_t)render->tex_height * 4) {
         lua_pushfstring(state, "texturedata: out-of-bounds section specified: reading %d bytes at pixel %d,%d in a texture of size %d,%d", len, x, y, render->tex_width, render->tex_height);
         lua_error(state);
     }
@@ -1119,7 +1143,7 @@ static int api_point_togameview(lua_State* state) {
     return 3;
 }
 
-#define LENGTH(N1, N2, N3) sqrt((N1 * N1) + (N2 * N2) + (N3 * N3))
+#define LENGTH(N1, N2, N3) sqrt(((N1) * (N1)) + ((N2) * (N2)) + ((N3) * (N3)))
 static int api_transform_decompose(lua_State* state) {
     const struct Transform3D* transform = require_self_userdata(state, "decompose");
     lua_pushnumber(state, transform->matrix[12]);
@@ -1161,10 +1185,11 @@ static int api_transform_get(lua_State* state) {
 static int api_surface_clear(lua_State* state) {
     const struct SurfaceFunctions* functions = require_self_userdata(state, "clear");
     const int argc = lua_gettop(state);
+    const double default_alpha = argc > 1 ? 1.0 : 0.0;
     const double r = (argc >= 2) ? luaL_checknumber(state, 2) : 0.0;
     const double g = (argc >= 3) ? luaL_checknumber(state, 3) : r;
     const double b = (argc >= 4) ? luaL_checknumber(state, 4) : r;
-    const double a = (argc >= 5) ? luaL_checknumber(state, 5) : ((argc > 1) ? 1.0 : 0.0);
+    const double a = (argc >= 5) ? luaL_checknumber(state, 5) : default_alpha;
     functions->clear(functions->userdata, r, g, b, a);
     return 0;
 }
@@ -1175,17 +1200,21 @@ static int api_surface_subimage(lua_State* state) {
     const lua_Integer y = luaL_checkinteger(state, 3);
     const lua_Integer w = luaL_checkinteger(state, 4);
     const lua_Integer h = luaL_checkinteger(state, 5);
-    const size_t req_length = w * h * 4;
+    if (x < INT_MIN || x > INT_MAX || y < INT_MIN || y > INT_MAX || w < 0 || w > INT_MAX || h < 0 || h > INT_MAX) {
+        lua_pushfstring(state, "subimage: invalid region specified: %d,%d, %dx%d", x, y, w, h);
+        lua_error(state);
+    }
+    const size_t req_length = (size_t)w * (size_t)h * 4;
     size_t length;
     const void* rgba;
     get_binary_data(state, 6, &rgba, &length);
     if (length >= req_length) {
-        functions->subimage(functions->userdata, x, y, w, h, rgba, 0);
+        functions->subimage(functions->userdata, (int)x, (int)y, (int)w, (int)h, rgba, 0);
     } else {
         uint8_t* ud = lua_newuserdata(state, req_length);
         memcpy(ud, rgba, length);
         memset(ud + length, 0, req_length - length);
-        functions->subimage(functions->userdata, x, y, w, h, (const void*)ud, 0);
+        functions->subimage(functions->userdata, (int)x, (int)y, (int)w, (int)h, (const void*)ud, 0);
         lua_pop(state, 1);
     }
     return 0;
@@ -1193,61 +1222,60 @@ static int api_surface_subimage(lua_State* state) {
 
 static int api_surface_drawtoscreen(lua_State* state) {
     const struct SurfaceFunctions* functions = require_self_userdata(state, "drawtoscreen");
-    const int sx = luaL_checkinteger(state, 2);
-    const int sy = luaL_checkinteger(state, 3);
-    const int sw = luaL_checkinteger(state, 4);
-    const int sh = luaL_checkinteger(state, 5);
-    const int dx = luaL_checkinteger(state, 6);
-    const int dy = luaL_checkinteger(state, 7);
-    const int dw = luaL_checkinteger(state, 8);
-    const int dh = luaL_checkinteger(state, 9);
-    _bolt_plugin_draw_to_overlay(functions, sx, sy, sw, sh, dx, dy, dw, dh);
+    const lua_Integer sx = luaL_checkinteger(state, 2);
+    const lua_Integer sy = luaL_checkinteger(state, 3);
+    const lua_Integer sw = luaL_checkinteger(state, 4);
+    const lua_Integer sh = luaL_checkinteger(state, 5);
+    const lua_Integer dx = luaL_checkinteger(state, 6);
+    const lua_Integer dy = luaL_checkinteger(state, 7);
+    const lua_Integer dw = luaL_checkinteger(state, 8);
+    const lua_Integer dh = luaL_checkinteger(state, 9);
+    _bolt_plugin_draw_to_overlay(functions, (int)sx, (int)sy, (int)sw, (int)sh, (int)dx, (int)dy, (int)dw, (int)dh);
     return 0;
 }
 
 static int api_surface_drawtosurface(lua_State* state) {
     const struct SurfaceFunctions* functions = require_self_userdata(state, "drawtosurface");
     const struct SurfaceFunctions* target = require_userdata(state, 2, "drawtosurface");
-    const int sx = luaL_checkinteger(state, 3);
-    const int sy = luaL_checkinteger(state, 4);
-    const int sw = luaL_checkinteger(state, 5);
-    const int sh = luaL_checkinteger(state, 6);
-    const int dx = luaL_checkinteger(state, 7);
-    const int dy = luaL_checkinteger(state, 8);
-    const int dw = luaL_checkinteger(state, 9);
-    const int dh = luaL_checkinteger(state, 10);
-    functions->draw_to_surface(functions->userdata, target->userdata, sx, sy, sw, sh, dx, dy, dw, dh);
+    const lua_Integer sx = luaL_checkinteger(state, 3);
+    const lua_Integer sy = luaL_checkinteger(state, 4);
+    const lua_Integer sw = luaL_checkinteger(state, 5);
+    const lua_Integer sh = luaL_checkinteger(state, 6);
+    const lua_Integer dx = luaL_checkinteger(state, 7);
+    const lua_Integer dy = luaL_checkinteger(state, 8);
+    const lua_Integer dw = luaL_checkinteger(state, 9);
+    const lua_Integer dh = luaL_checkinteger(state, 10);
+    functions->draw_to_surface(functions->userdata, target->userdata, (int)sx, (int)sy, (int)sw, (int)sh, (int)dx, (int)dy, (int)dw, (int)dh);
     return 0;
 }
 
 static int api_surface_drawtogameview(lua_State* state) {
     const struct SurfaceFunctions* functions = require_self_userdata(state, "drawtogameview");
     const struct RenderGameViewEvent* gameview = require_userdata(state, 2, "drawtogameview");
-    const int sx = luaL_checkinteger(state, 3);
-    const int sy = luaL_checkinteger(state, 4);
-    const int sw = luaL_checkinteger(state, 5);
-    const int sh = luaL_checkinteger(state, 6);
-    const int dx = luaL_checkinteger(state, 7);
-    const int dy = luaL_checkinteger(state, 8);
-    const int dw = luaL_checkinteger(state, 9);
-    const int dh = luaL_checkinteger(state, 10);
-    functions->draw_to_gameview(functions->userdata, gameview->functions.userdata, sx, sy, sw, sh, dx, dy, dw, dh);
+    const lua_Integer sx = luaL_checkinteger(state, 3);
+    const lua_Integer sy = luaL_checkinteger(state, 4);
+    const lua_Integer sw = luaL_checkinteger(state, 5);
+    const lua_Integer sh = luaL_checkinteger(state, 6);
+    const lua_Integer dx = luaL_checkinteger(state, 7);
+    const lua_Integer dy = luaL_checkinteger(state, 8);
+    const lua_Integer dw = luaL_checkinteger(state, 9);
+    const lua_Integer dh = luaL_checkinteger(state, 10);
+    functions->draw_to_gameview(functions->userdata, gameview->functions.userdata, (int)sx, (int)sy, (int)sw, (int)sh, (int)dx, (int)dy, (int)dw, (int)dh);
     return 0;
 }
 
 static int api_surface_drawtowindow(lua_State* state) {
     const struct SurfaceFunctions* functions = require_self_userdata(state, "drawtowindow");
     const struct EmbeddedWindow* target = require_userdata(state, 2, "drawtowindow");
-    const int sx = luaL_checkinteger(state, 3);
-    const int sy = luaL_checkinteger(state, 4);
-    const int sw = luaL_checkinteger(state, 5);
-    const int sh = luaL_checkinteger(state, 6);
-    const int dx = luaL_checkinteger(state, 7);
-    const int dy = luaL_checkinteger(state, 8);
-    const int dw = luaL_checkinteger(state, 9);
-    const int dh = luaL_checkinteger(state, 10);
-    functions->draw_to_surface(functions->userdata, target->surface_functions.userdata, sx, sy, sw, sh, dx, dy, dw, dh);
-    return 0;
+    const lua_Integer sx = luaL_checkinteger(state, 3);
+    const lua_Integer sy = luaL_checkinteger(state, 4);
+    const lua_Integer sw = luaL_checkinteger(state, 5);
+    const lua_Integer sh = luaL_checkinteger(state, 6);
+    const lua_Integer dx = luaL_checkinteger(state, 7);
+    const lua_Integer dy = luaL_checkinteger(state, 8);
+    const lua_Integer dw = luaL_checkinteger(state, 9);
+    const lua_Integer dh = luaL_checkinteger(state, 10);
+    functions->draw_to_surface(functions->userdata, target->surface_functions.userdata, (int)sx, (int)sy, (int)sw, (int)sh, (int)dx, (int)dy, (int)dw, (int)dh);    return 0;
 }
 
 static int api_surface_settint(lua_State* state) {
@@ -1275,17 +1303,18 @@ static int api_window_close(lua_State* state) {
 static int api_window_clear(lua_State* state) {
     const struct EmbeddedWindow* window = require_self_userdata(state, "clear");
     const int argc = lua_gettop(state);
+    const double default_alpha = argc > 1 ? 1.0 : 0.0;
     const double r = (argc >= 2) ? luaL_checknumber(state, 2) : 0.0;
     const double g = (argc >= 3) ? luaL_checknumber(state, 3) : r;
     const double b = (argc >= 4) ? luaL_checknumber(state, 4) : r;
-    const double a = (argc >= 5) ? luaL_checknumber(state, 5) : ((argc > 1) ? 1.0 : 0.0);
+    const double a = (argc >= 5) ? luaL_checknumber(state, 5) : default_alpha;
     window->surface_functions.clear(window->surface_functions.userdata, r, g, b, a);
     return 0;
 }
 
 static int api_window_id(lua_State* state) {
     const struct EmbeddedWindow* window = require_self_userdata(state, "id");
-    lua_pushinteger(state, window->id);
+    lua_pushinteger(state, (lua_Integer)window->id);
     return 1;
 }
 
@@ -1295,17 +1324,21 @@ static int api_window_subimage(lua_State* state) {
     const lua_Integer y = luaL_checkinteger(state, 3);
     const lua_Integer w = luaL_checkinteger(state, 4);
     const lua_Integer h = luaL_checkinteger(state, 5);
-    const size_t req_length = w * h * 4;
+    if (x < INT_MIN || x > INT_MAX || y < INT_MIN || y > INT_MAX || w < 0 || w > INT_MAX || h < 0 || h > INT_MAX) {
+        lua_pushfstring(state, "subimage: invalid region specified: %d,%d, %dx%d", x, y, w, h);
+        lua_error(state);
+    }
+    const size_t req_length = (size_t)w * (size_t)h * 4;
     size_t length;
     const void* rgba;
     get_binary_data(state, 6, &rgba, &length);
     if (length >= req_length) {
-        window->surface_functions.subimage(window->surface_functions.userdata, x, y, w, h, rgba, 0);
+        window->surface_functions.subimage(window->surface_functions.userdata, (int)x, (int)y, (int)w, (int)h, rgba, 0);
     } else {
         uint8_t* ud = lua_newuserdata(state, req_length);
         memcpy(ud, rgba, length);
         memset(ud + length, 0, req_length - length);
-        window->surface_functions.subimage(window->surface_functions.userdata, x, y, w, h, (const void*)ud, 0);
+        window->surface_functions.subimage(window->surface_functions.userdata, (int)x, (int)y, (int)w, (int)h, (const void*)ud, 0);
         lua_pop(state, 1);
     }
     return 0;
@@ -1317,8 +1350,10 @@ static int api_window_startreposition(lua_State* state) {
     const lua_Integer yscale = luaL_checkinteger(state, 3);
     window->reposition_mode = true;
     window->reposition_threshold = false;
-    window->reposition_w = (xscale == 0) ? 0 : ((xscale > 0) ? 1 : -1);
-    window->reposition_h = (yscale == 0) ? 0 : ((yscale > 0) ? 1 : -1);
+    window->reposition_w = 0;
+    window->reposition_h = 0;
+    if (xscale != 0) window->reposition_w = xscale > 0 ? 1 : -1;
+    if (yscale != 0) window->reposition_h = yscale > 0 ? 1 : -1;
     return 0;
 }
 
@@ -1405,7 +1440,7 @@ static int api_render3d_vertexmeta(lua_State* state) {
         lua_pushfstring(state, "vertexmeta: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
         lua_error(state);
     }
-    const size_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
+    const uint32_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
     lua_pushinteger(state, meta);
     return 1;
 }
@@ -1454,7 +1489,7 @@ static int api_render3d_vertexcolour(lua_State* state) {
 
 static int api_render3d_textureid(lua_State* state) {
     const struct Render3D* render = require_self_userdata(state, "textureid");
-    const size_t id = render->texture_functions.id(render->texture_functions.userdata);
+    const unsigned int id = render->texture_functions.id(render->texture_functions.userdata);
     lua_pushinteger(state, id);
     return 1;
 }
@@ -1463,8 +1498,8 @@ static int api_render3d_texturesize(lua_State* state) {
     const struct Render3D* render = require_self_userdata(state, "texturesize");
     size_t size[2];
     render->texture_functions.size(render->texture_functions.userdata, size);
-    lua_pushinteger(state, size[0]);
-    lua_pushinteger(state, size[1]);
+    lua_pushinteger(state, (lua_Integer)size[0]);
+    lua_pushinteger(state, (lua_Integer)size[1]);
     return 2;
 }
 
@@ -1475,7 +1510,7 @@ static int api_render3d_texturecompare(lua_State* state) {
     size_t data_len;
     const void* data;
     get_binary_data(state, 4, &data, &data_len);
-    if (x < 0 || y < 0 || (x * 4) + data_len >= (render->tex_width * 4) || y >= render->tex_height) {
+    if (x < 0 || y < 0 || (x * 4) + data_len >= ((size_t)render->tex_width * 4) || y >= render->tex_height) {
         lua_pushfstring(state, "texturecompare: out-of-bounds section specified: comparing %d bytes at pixel %d,%d in a texture of size %d,%d", data_len, x, y, render->tex_width, render->tex_height);
         lua_error(state);
     }
@@ -1489,7 +1524,7 @@ static int api_render3d_texturedata(lua_State* state) {
     const size_t x = luaL_checkinteger(state, 2);
     const size_t y = luaL_checkinteger(state, 3);
     const size_t len = luaL_checkinteger(state, 4);
-    if (x < 0 || y < 0 || (y * render->tex_width + x) * 4 + len > render->tex_width * render->tex_height * 4) {
+    if (x < 0 || y < 0 || ((y * render->tex_width + x) * 4) + len > (size_t)render->tex_width * (size_t)render->tex_height * 4) {
         lua_pushfstring(state, "texturedata: out-of-bounds section specified: reading %d bytes at pixel %d,%d in a texture of size %d,%d", len, x, y, render->tex_width, render->tex_height);
         lua_error(state);
     }
@@ -1616,7 +1651,7 @@ static int api_renderparticles_vertexmeta(lua_State* state) {
         lua_pushfstring(state, "vertexmeta: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
         lua_error(state);
     }
-    const size_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
+    const uint32_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
     lua_pushinteger(state, meta);
     return 1;
 }
@@ -1635,7 +1670,7 @@ static int api_renderparticles_atlasxywh(lua_State* state) {
 
 static int api_renderparticles_textureid(lua_State* state) {
     const struct RenderParticles* render = require_self_userdata(state, "textureid");
-    const size_t id = render->texture_functions.id(render->texture_functions.userdata);
+    const unsigned int id = render->texture_functions.id(render->texture_functions.userdata);
     lua_pushinteger(state, id);
     return 1;
 }
@@ -1644,8 +1679,8 @@ static int api_renderparticles_texturesize(lua_State* state) {
     const struct RenderParticles* render = require_self_userdata(state, "texturesize");
     size_t size[2];
     render->texture_functions.size(render->texture_functions.userdata, size);
-    lua_pushinteger(state, size[0]);
-    lua_pushinteger(state, size[1]);
+    lua_pushinteger(state, (lua_Integer)size[0]);
+    lua_pushinteger(state, (lua_Integer)size[1]);
     return 2;
 }
 
@@ -1656,7 +1691,7 @@ static int api_renderparticles_texturecompare(lua_State* state) {
     size_t data_len;
     const void* data;
     get_binary_data(state, 4, &data, &data_len);
-    if (x < 0 || y < 0 || (x * 4) + data_len >= (render->tex_width * 4) || y >= render->tex_height) {
+    if (x < 0 || y < 0 || (x * 4) + data_len >= ((size_t)render->tex_width * 4) || y >= render->tex_height) {
         lua_pushfstring(state, "texturecompare: out-of-bounds section specified: comparing %d bytes at pixel %d,%d in a texture of size %d,%d", data_len, x, y, render->tex_width, render->tex_height);
         lua_error(state);
     }
@@ -1670,7 +1705,7 @@ static int api_renderparticles_texturedata(lua_State* state) {
     const size_t x = luaL_checkinteger(state, 2);
     const size_t y = luaL_checkinteger(state, 3);
     const size_t len = luaL_checkinteger(state, 4);
-    if (x < 0 || y < 0 || (y * render->tex_width + x) * 4 + len > render->tex_width * render->tex_height * 4) {
+    if (x < 0 || y < 0 || ((y * render->tex_width + x) * 4) + len > (size_t)render->tex_width * (size_t)render->tex_height * 4) {
         lua_pushfstring(state, "texturedata: out-of-bounds section specified: reading %d bytes at pixel %d,%d in a texture of size %d,%d", len, x, y, render->tex_width, render->tex_height);
         lua_error(state);
     }
@@ -1781,7 +1816,7 @@ static int api_renderbillboard_vertexmeta(lua_State* state) {
         lua_pushfstring(state, "vertexmeta: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
         lua_error(state);
     }
-    const size_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
+    const uint32_t meta = render->vertex_functions.atlas_meta(index - 1, render->vertex_functions.userdata);
     lua_pushinteger(state, meta);
     return 1;
 }
@@ -1800,7 +1835,7 @@ static int api_renderbillboard_atlasxywh(lua_State* state) {
 
 static int api_renderbillboard_textureid(lua_State* state) {
     const struct RenderBillboard* render = require_self_userdata(state, "textureid");
-    const size_t id = render->texture_functions.id(render->texture_functions.userdata);
+    const unsigned int id = render->texture_functions.id(render->texture_functions.userdata);
     lua_pushinteger(state, id);
     return 1;
 }
@@ -1809,8 +1844,8 @@ static int api_renderbillboard_texturesize(lua_State* state) {
     const struct RenderBillboard* render = require_self_userdata(state, "texturesize");
     size_t size[2];
     render->texture_functions.size(render->texture_functions.userdata, size);
-    lua_pushinteger(state, size[0]);
-    lua_pushinteger(state, size[1]);
+    lua_pushinteger(state, (lua_Integer)size[0]);
+    lua_pushinteger(state, (lua_Integer)size[1]);
     return 2;
 }
 
@@ -1821,7 +1856,7 @@ static int api_renderbillboard_texturecompare(lua_State* state) {
     size_t data_len;
     const void* data;
     get_binary_data(state, 4, &data, &data_len);
-    if (x < 0 || y < 0 || (x * 4) + data_len >= (render->tex_width * 4) || y >= render->tex_height) {
+    if (x < 0 || y < 0 || (x * 4) + data_len >= ((size_t)render->tex_width * 4) || y >= render->tex_height) {
         lua_pushfstring(state, "texturecompare: out-of-bounds section specified: comparing %d bytes at pixel %d,%d in a texture of size %d,%d", data_len, x, y, render->tex_width, render->tex_height);
         lua_error(state);
     }
@@ -1835,7 +1870,7 @@ static int api_renderbillboard_texturedata(lua_State* state) {
     const size_t x = luaL_checkinteger(state, 2);
     const size_t y = luaL_checkinteger(state, 3);
     const size_t len = luaL_checkinteger(state, 4);
-    if (x < 0 || y < 0 || (y * render->tex_width + x) * 4 + len > render->tex_width * render->tex_height * 4) {
+    if (x < 0 || y < 0 || ((y * render->tex_width + x) * 4) + len > (size_t)render->tex_width * (size_t)render->tex_height * 4) {
         lua_pushfstring(state, "texturedata: out-of-bounds section specified: reading %d bytes at pixel %d,%d in a texture of size %d,%d", len, x, y, render->tex_width, render->tex_height);
         lua_error(state);
     }
@@ -2122,7 +2157,7 @@ static int api_scroll_direction(lua_State* state) {
 static int api_browser_close(lua_State* state) {
     const struct ExternalBrowser* browser = require_self_userdata(state, "close");
     if (browser->do_capture) browser->plugin->ext_browser_capture_count += 1;
-    hashmap_delete(browser->plugin->external_browsers, &browser);
+    hashmap_delete(browser->plugin->external_browsers, (const void*)&browser);
 
     const enum BoltIPCMessageTypeToHost msg_type = IPC_MSG_CLOSEBROWSER_EXTERNAL;
     const struct BoltIPCCloseBrowserHeader header = { .plugin_id = browser->plugin_id, .window_id = browser->id };
@@ -2276,11 +2311,15 @@ static int api_buffer_setbuffer(lua_State* state) {
 
 static int api_swapbuffers_readpixels(lua_State* state) {
     const struct SwapBuffersEvent* event = require_self_userdata(state, "readpixels");
-    const int16_t x = luaL_checkinteger(state, 2);
-    const int16_t y = luaL_checkinteger(state, 3);
-    const uint16_t w = luaL_checkinteger(state, 4);
-    const uint16_t h = luaL_checkinteger(state, 5);
-    const size_t size = w * h * 3;
+    const lua_Integer x = luaL_checkinteger(state, 2);
+    const lua_Integer y = luaL_checkinteger(state, 3);
+    const lua_Integer w = luaL_checkinteger(state, 4);
+    const lua_Integer h = luaL_checkinteger(state, 5);
+    if (x < 0 || y < 0 || w <= 0 || h <= 0 || x > INT16_MAX || y > INT16_MAX || w > UINT16_MAX || h > UINT16_MAX) {
+        lua_pushfstring(state, "readpixels: invalid region specified: %d,%d, %dx%d", x, y, w, h);
+        lua_error(state);
+    }
+    const size_t size = (size_t)w * (size_t)h * 3;
 
     const struct PluginManagedFunctions* managed_functions = _bolt_plugin_managed_functions();
     struct FixedBuffer* buffer = lua_newuserdata(state, sizeof(struct FixedBuffer));
@@ -2291,23 +2330,23 @@ static int api_swapbuffers_readpixels(lua_State* state) {
     }
     buffer->size = size;
     SETMETATABLE(buffer)
-    managed_functions->read_screen_pixels(x, y, w, h, buffer->data);
+    managed_functions->read_screen_pixels((int16_t)x, (int16_t)y, (uint16_t)w, (uint16_t)h, buffer->data);
     return 1;
 }
 
 static int api_swapbuffers_copytosurface(lua_State* state) {
     const struct SwapBuffersEvent* event = require_self_userdata(state, "copytosurface");
     const struct SurfaceFunctions* target = require_userdata(state, 2, "copytosurface");
-    const int sx = luaL_checkinteger(state, 3);
-    const int sy = luaL_checkinteger(state, 4);
-    const int sw = luaL_checkinteger(state, 5);
-    const int sh = luaL_checkinteger(state, 6);
-    const int dx = luaL_checkinteger(state, 7);
-    const int dy = luaL_checkinteger(state, 8);
-    const int dw = luaL_checkinteger(state, 9);
-    const int dh = luaL_checkinteger(state, 10);
+    const lua_Integer sx = luaL_checkinteger(state, 3);
+    const lua_Integer sy = luaL_checkinteger(state, 4);
+    const lua_Integer sw = luaL_checkinteger(state, 5);
+    const lua_Integer sh = luaL_checkinteger(state, 6);
+    const lua_Integer dx = luaL_checkinteger(state, 7);
+    const lua_Integer dy = luaL_checkinteger(state, 8);
+    const lua_Integer dw = luaL_checkinteger(state, 9);
+    const lua_Integer dh = luaL_checkinteger(state, 10);
     const struct PluginManagedFunctions* managed_functions = _bolt_plugin_managed_functions();
-    managed_functions->copy_screen(target->userdata, sx, sy, sw, sh, dx, dy, dw, dh);
+    managed_functions->copy_screen(target->userdata, (int)sx, (int)sy, (int)sw, (int)sh, (int)dx, (int)dy, (int)dw, (int)dh);
     return 0;
 }
 
@@ -2335,8 +2374,9 @@ static int api_shaderprogram_setattribute(lua_State* state) {
 static int api_shaderprogram_setuniform##N##i(lua_State* state) { \
     struct ShaderProgramFunctions* program = require_self_userdata(state, "setuniform" #N "i"); \
     const lua_Integer location = luaL_checkinteger(state, 2); \
+    BOUNDCHECK(state, location, INT_MIN, INT_MAX, "setuniform" #N "i", "location") \
     int values[N]; \
-    for (size_t i = 0; i < N; i += 1) { \
+    for (size_t i = 0; i < (N); i += 1) { \
         values[i] = (int)luaL_checkinteger(state, i + 3); \
     } \
     program->set_uniform_ints(program->userdata, location, N, values); \
@@ -2345,8 +2385,9 @@ static int api_shaderprogram_setuniform##N##i(lua_State* state) { \
 static int api_shaderprogram_setuniform##N##f(lua_State* state) { \
     struct ShaderProgramFunctions* program = require_self_userdata(state, "setuniform" #N "f"); \
     const lua_Integer location = luaL_checkinteger(state, 2); \
+    BOUNDCHECK(state, location, INT_MIN, INT_MAX, "setuniform" #N "f", "location") \
     double values[N]; \
-    for (size_t i = 0; i < N; i += 1) { \
+    for (size_t i = 0; i < (N); i += 1) { \
         values[i] = (double)luaL_checknumber(state, i + 3); \
     } \
     program->set_uniform_floats(program->userdata, location, N, values); \
@@ -2363,12 +2404,15 @@ DEFSETUNIFORM(4)
 static int api_shaderprogram_setuniformmatrix##N##f(lua_State* state) { \
     struct ShaderProgramFunctions* program = require_self_userdata(state, "setuniformmatrix" #N "f"); \
     const lua_Integer location = luaL_checkinteger(state, 2); \
+    BOUNDCHECK(state, location, INT_MIN, INT_MAX, "setuniformmatrix" #N "f", "location") \
     const uint8_t transpose = lua_toboolean(state, 3); \
-    double values[N * N]; \
-    for (size_t i = 0; i < (N * N); i += 1) { \
+    const size_t n = (size_t)(N); \
+    const size_t nsquared = n * n; \
+    double values[nsquared]; \
+    for (size_t i = 0; i < nsquared; i += 1) { \
         values[i] = (double)luaL_checknumber(state, i + 4); \
     } \
-    program->set_uniform_matrix(program->userdata, location, transpose, N, values); \
+    program->set_uniform_matrix(program->userdata, (int)location, transpose, N, values); \
     return 0; \
 }
 
@@ -2380,16 +2424,18 @@ DEFSETUNIFORMMATRIX(4)
 static int api_shaderprogram_setuniformsurface(lua_State* state) {
     struct ShaderProgramFunctions* program = require_self_userdata(state, "setuniformsurface");
     const lua_Integer location = luaL_checkinteger(state, 2);
+    BOUNDCHECK(state, location, INT_MIN, INT_MAX, "setuniformsurface", "location")
     const struct SurfaceFunctions* surface = require_userdata(state, 3, "setuniformsurface");
-    program->set_uniform_surface(program->userdata, location, surface->userdata);
+    program->set_uniform_surface(program->userdata, (int)location, surface->userdata);
     return 0;
 }
 
 static int api_shaderprogram_setuniformdepthbuffer(lua_State* state) {
     struct ShaderProgramFunctions* program = require_self_userdata(state, "setuniformdepthbuffer");
     const lua_Integer location = luaL_checkinteger(state, 2);
+    BOUNDCHECK(state, location, INT_MIN, INT_MAX, "setuniformdepthbuffer", "location")
     const struct RenderGameViewEvent* event = require_userdata(state, 3, "setuniformdepthbuffer");
-    program->set_uniform_depthbuffer(program->userdata, event->functions.userdata, location);
+    program->set_uniform_depthbuffer(program->userdata, event->functions.userdata, (int)location);
     return 0;
 }
 
@@ -2436,7 +2482,7 @@ static void populate_table(lua_State* state, const struct ApiFuncTemplate* funct
     }
 }
 
-static void push_metatable(lua_State* state, const struct ApiFuncTemplate* functions, size_t count) {
+static void push_metatable(lua_State* state, const struct ApiFuncTemplate* functions, int count) {
     lua_newtable(state);
     lua_pushliteral(state, "__index");
     lua_createtable(state, 0, count);
@@ -2444,7 +2490,7 @@ static void push_metatable(lua_State* state, const struct ApiFuncTemplate* funct
     lua_settable(state, -3);
 }
 
-static void push_metatable_with_gc(lua_State* state, const struct ApiFuncTemplate* functions, size_t count, int(*gc)(lua_State*)) {
+static void push_metatable_with_gc(lua_State* state, const struct ApiFuncTemplate* functions, int count, int(*gc)(lua_State*)) {
     push_metatable(state, functions, count);
     lua_pushliteral(state, "__gc");
     lua_pushcfunction(state, gc);
@@ -2452,7 +2498,7 @@ static void push_metatable_with_gc(lua_State* state, const struct ApiFuncTemplat
 }
 
 #define BOLTFUNC(NAME) {.func=api_##NAME, .name=#NAME, .size=sizeof #NAME - sizeof *#NAME}
-static struct ApiFuncTemplate bolt_functions[] = {
+static const struct ApiFuncTemplate bolt_functions[] = {
     BOLTFUNC(apiversion),
     BOLTFUNC(checkversion),
     BOLTFUNC(close),
@@ -2515,7 +2561,7 @@ static struct ApiFuncTemplate bolt_functions[] = {
 #define BOLTFUNC(NAME, OBJECT) {.func=api_##OBJECT##_##NAME, .name=#NAME, .size=sizeof(#NAME)-sizeof(*#NAME)}
 #define BOLTALIAS(REALNAME, ALIAS, OBJECT) {.func=api_##OBJECT##_##REALNAME, .name=#ALIAS, .size=sizeof(#ALIAS)-sizeof(*#ALIAS)}
 
-static struct ApiFuncTemplate render2d_functions[] = {
+static const struct ApiFuncTemplate render2d_functions[] = {
     BOLTFUNC(vertexcount, batch2d),
     BOLTFUNC(verticesperimage, batch2d),
     BOLTFUNC(targetsize, batch2d),
@@ -2533,7 +2579,7 @@ static struct ApiFuncTemplate render2d_functions[] = {
     BOLTALIAS(vertexcolour, vertexcolor, batch2d),
 };
 
-static struct ApiFuncTemplate render3d_functions[] = {
+static const struct ApiFuncTemplate render3d_functions[] = {
     BOLTFUNC(vertexcount, render3d),
     BOLTFUNC(vertexpoint, render3d),
     BOLTFUNC(modelmatrix, render3d),
@@ -2556,7 +2602,7 @@ static struct ApiFuncTemplate render3d_functions[] = {
     BOLTALIAS(projmatrix, projectionmatrix, render3d),
 };
 
-static struct ApiFuncTemplate renderparticles_functions[] = {
+static const struct ApiFuncTemplate renderparticles_functions[] = {
     BOLTFUNC(vertexcount, renderparticles),
     BOLTFUNC(vertexparticleorigin, renderparticles),
     BOLTFUNC(vertexworldoffset, renderparticles),
@@ -2578,7 +2624,7 @@ static struct ApiFuncTemplate renderparticles_functions[] = {
     BOLTALIAS(projmatrix, projectionmatrix, renderparticles),
 };
 
-static struct ApiFuncTemplate renderbillboard_functions[] = {
+static const struct ApiFuncTemplate renderbillboard_functions[] = {
     BOLTFUNC(vertexcount, renderbillboard),
     BOLTFUNC(verticesperimage, renderbillboard),
     BOLTFUNC(vertexpoint, renderbillboard),
@@ -2601,7 +2647,7 @@ static struct ApiFuncTemplate renderbillboard_functions[] = {
     BOLTALIAS(projmatrix, projectionmatrix, renderbillboard),
 };
 
-static struct ApiFuncTemplate rendericon_functions[] = {
+static const struct ApiFuncTemplate rendericon_functions[] = {
     BOLTFUNC(xywh, rendericon),
     BOLTFUNC(modelcount, rendericon),
     BOLTFUNC(modelvertexcount, rendericon),
@@ -2618,23 +2664,23 @@ static struct ApiFuncTemplate rendericon_functions[] = {
     BOLTFUNC(targetsize, rendericon),
 };
 
-static struct ApiFuncTemplate minimapterrain_functions[] = {
+static const struct ApiFuncTemplate minimapterrain_functions[] = {
     BOLTFUNC(angle, minimapterrain),
     BOLTFUNC(scale, minimapterrain),
     BOLTFUNC(position, minimapterrain),
 };
 
-static struct ApiFuncTemplate renderminimap_functions[] = {
+static const struct ApiFuncTemplate renderminimap_functions[] = {
     BOLTFUNC(sourcexywh, renderminimap),
     BOLTFUNC(targetxywh, renderminimap),
     BOLTFUNC(targetsize, renderminimap),
 };
 
-static struct ApiFuncTemplate rendergameview_functions[] = {
+static const struct ApiFuncTemplate rendergameview_functions[] = {
     BOLTFUNC(size, rendergameview),
 };
 
-static struct ApiFuncTemplate point_functions[] = {
+static const struct ApiFuncTemplate point_functions[] = {
     BOLTFUNC(transform, point),
     BOLTFUNC(get, point),
     BOLTFUNC(toscreen, point),
@@ -2642,12 +2688,12 @@ static struct ApiFuncTemplate point_functions[] = {
     BOLTFUNC(togameview, point),
 };
 
-static struct ApiFuncTemplate transform_functions[] = {
+static const struct ApiFuncTemplate transform_functions[] = {
     BOLTFUNC(decompose, transform),
     BOLTFUNC(get, transform),
 };
 
-static struct ApiFuncTemplate buffer_functions[] = {
+static const struct ApiFuncTemplate buffer_functions[] = {
     BOLTFUNC(getint8, buffer),
     BOLTFUNC(getint16, buffer),
     BOLTFUNC(getint32, buffer),
@@ -2672,12 +2718,12 @@ static struct ApiFuncTemplate buffer_functions[] = {
     BOLTFUNC(setbuffer, buffer),
 };
 
-static struct ApiFuncTemplate swapbuffers_functions[] = {
+static const struct ApiFuncTemplate swapbuffers_functions[] = {
     BOLTFUNC(readpixels, swapbuffers),
     BOLTFUNC(copytosurface, swapbuffers),
 };
 
-static struct ApiFuncTemplate shaderprogram_functions[] = {
+static const struct ApiFuncTemplate shaderprogram_functions[] = {
     BOLTFUNC(setattribute, shaderprogram),
     BOLTFUNC(setuniform1i, shaderprogram),
     BOLTFUNC(setuniform2i, shaderprogram),
@@ -2696,7 +2742,7 @@ static struct ApiFuncTemplate shaderprogram_functions[] = {
     BOLTFUNC(drawtogameview, shaderprogram),
 };
 
-static struct ApiFuncTemplate surface_functions[] = {
+static const struct ApiFuncTemplate surface_functions[] = {
     BOLTFUNC(clear, surface),
     BOLTFUNC(subimage, surface),
     BOLTFUNC(drawtoscreen, surface),
@@ -2707,7 +2753,7 @@ static struct ApiFuncTemplate surface_functions[] = {
     BOLTFUNC(setalpha, surface),
 };
 
-static struct ApiFuncTemplate window_functions[] = {
+static const struct ApiFuncTemplate window_functions[] = {
     BOLTFUNC(close, window),
     BOLTFUNC(id, window),
     BOLTFUNC(clear, window),
@@ -2723,7 +2769,7 @@ static struct ApiFuncTemplate window_functions[] = {
     BOLTFUNC(onmouseleave, window),
 };
 
-static struct ApiFuncTemplate browser_functions[] = {
+static const struct ApiFuncTemplate browser_functions[] = {
     BOLTFUNC(close, browser),
     BOLTFUNC(sendmessage, browser),
     BOLTFUNC(enablecapture, browser),
@@ -2733,7 +2779,7 @@ static struct ApiFuncTemplate browser_functions[] = {
     BOLTFUNC(onmessage, browser),
 };
 
-static struct ApiFuncTemplate embeddedbrowser_functions[] = {
+static const struct ApiFuncTemplate embeddedbrowser_functions[] = {
     BOLTFUNC(close, embeddedbrowser),
     BOLTFUNC(sendmessage, embeddedbrowser),
     BOLTFUNC(startreposition, window),
@@ -2752,12 +2798,12 @@ static struct ApiFuncTemplate embeddedbrowser_functions[] = {
     BOLTFUNC(onmouseleave, browser),
 };
 
-static struct ApiFuncTemplate reposition_functions[] = {
+static const struct ApiFuncTemplate reposition_functions[] = {
     BOLTFUNC(xywh, repositionevent),
     BOLTFUNC(didresize, repositionevent)
 };
 
-static struct ApiFuncTemplate mousemotion_functions[] = {
+static const struct ApiFuncTemplate mousemotion_functions[] = {
     BOLTFUNC(xy, mouseevent),
     BOLTFUNC(ctrl, mouseevent),
     BOLTFUNC(shift, mouseevent),
@@ -2768,7 +2814,7 @@ static struct ApiFuncTemplate mousemotion_functions[] = {
     BOLTFUNC(mousebuttons, mouseevent),
 };
 
-static struct ApiFuncTemplate mousebutton_functions[] = {
+static const struct ApiFuncTemplate mousebutton_functions[] = {
     BOLTFUNC(xy, mouseevent),
     BOLTFUNC(ctrl, mouseevent),
     BOLTFUNC(shift, mouseevent),
@@ -2780,7 +2826,7 @@ static struct ApiFuncTemplate mousebutton_functions[] = {
     BOLTFUNC(button, mousebutton),
 };
 
-static struct ApiFuncTemplate scroll_functions[] = {
+static const struct ApiFuncTemplate scroll_functions[] = {
     BOLTFUNC(xy, mouseevent),
     BOLTFUNC(ctrl, mouseevent),
     BOLTFUNC(shift, mouseevent),
@@ -2792,7 +2838,7 @@ static struct ApiFuncTemplate scroll_functions[] = {
     BOLTFUNC(direction, scroll),
 };
 
-static struct ApiFuncTemplate mouseleave_functions[] = {
+static const struct ApiFuncTemplate mouseleave_functions[] = {
     BOLTFUNC(xy, mouseevent),
     BOLTFUNC(ctrl, mouseevent),
     BOLTFUNC(shift, mouseevent),
@@ -2807,7 +2853,7 @@ static struct ApiFuncTemplate mouseleave_functions[] = {
 #undef BOLTALIAS
 
 void _bolt_api_push_bolt_table(lua_State* state) {
-    const size_t count = sizeof bolt_functions / sizeof *bolt_functions;
+    const int count = sizeof bolt_functions / sizeof *bolt_functions;
     lua_createtable(state, 0, count);
     populate_table(state, bolt_functions, count);
 }

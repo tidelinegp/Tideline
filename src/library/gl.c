@@ -99,8 +99,8 @@ struct GLProgram {
     GLint offset_uParticleEmitterTransformRanges;
     GLuint block_index_TerrainConsts;
     GLint offset_uGridSize;
-    GLint block_index_GUIConsts;
-    GLint block_index_BilloardConsts; // not a mistake, the game engine spells it like that
+    GLuint block_index_GUIConsts;
+    GLuint block_index_BilloardConsts; // not a mistake, the game engine spells it like that
     uint8_t is_minimap;
     uint8_t is_2d;
     uint8_t is_3d;
@@ -277,15 +277,15 @@ static const GLchar program_region_fs[] = GLSLHEADER
   "col = vec4(rgb, rgb, rgb, alpha);"
 "}";
 
-static void context_init(struct GLContext*, void*, void*);
-static void context_free(struct GLContext*);
+static void context_init(struct GLContext* context, void* egl_context, void* egl_share);
+static void context_free(struct GLContext* context);
 
 static void glplugin_drawelements_vertex2d_xy(size_t index, void* userdata, int32_t* out);
 static void glplugin_drawelements_vertex2d_atlas_details(size_t index, void* userdata, int32_t* out, uint8_t* wrapx, uint8_t* wrapy);
 static void glplugin_drawelements_vertex2d_uv(size_t index, void* userdata, double* out, uint8_t* discard);
 static void glplugin_drawelements_vertex2d_colour(size_t index, void* userdata, double* out);
 static void glplugin_drawelements_vertex3d_xyz(size_t index, void* userdata, struct Point3D* out);
-static size_t glplugin_drawelements_vertex3d_atlas_meta(size_t index, void* userdata);
+static uint32_t glplugin_drawelements_vertex3d_atlas_meta(size_t index, void* userdata);
 static void glplugin_drawelements_vertex3d_meta_xywh(size_t meta, void* userdata, int32_t* out);
 static void glplugin_drawelements_vertex3d_uv(size_t index, void* userdata, double* out);
 static void glplugin_drawelements_vertex3d_colour(size_t index, void* userdata, double* out);
@@ -295,14 +295,14 @@ static void glplugin_drawelements_vertexparticles_xyz(size_t index, void* userda
 static void glplugin_drawelements_vertexparticles_world_offset(size_t index, void* userdata, double* out);
 static void glplugin_drawelements_vertexparticles_eye_offset(size_t index, void* userdata, double* out);
 static void glplugin_drawelements_vertexparticles_uv(size_t index, void* userdata, double* out);
-static size_t glplugin_drawelements_vertexparticles_atlas_meta(size_t index, void* userdata);
-static void glplugin_drawelements_vertexparticles_meta_xywh(size_t index, void* userdata, int32_t* out);
+static uint32_t glplugin_drawelements_vertexparticles_atlas_meta(size_t index, void* userdata);
+static void glplugin_drawelements_vertexparticles_meta_xywh(size_t meta, void* userdata, int32_t* out);
 static void glplugin_drawelements_vertexparticles_colour(size_t index, void* userdata, double* out);
 static void glplugin_drawelements_vertexbillboard_xyz(size_t index, void* userdata, struct Point3D* out);
 static void glplugin_drawelements_vertexbillboard_eye_offset(size_t index, void* userdata, double* out);
 static void glplugin_drawelements_vertexbillboard_uv(size_t index, void* userdata, double* out);
-static size_t glplugin_drawelements_vertexbillboard_atlas_meta(size_t index, void* userdata);
-static void glplugin_drawelements_vertexbillboard_meta_xywh(size_t index, void* userdata, int32_t* out);
+static uint32_t glplugin_drawelements_vertexbillboard_atlas_meta(size_t index, void* userdata);
+static void glplugin_drawelements_vertexbillboard_meta_xywh(size_t meta, void* userdata, int32_t* out);
 static void glplugin_drawelements_vertexbillboard_colour(size_t index, void* userdata, double* out);
 static void glplugin_matrixparticles_viewmatrix(void* userdata, struct Transform3D* out);
 static void glplugin_matrixparticles_projectionmatrix(void* userdata, struct Transform3D* out);
@@ -318,13 +318,13 @@ static void glplugin_matrix3d_viewmatrix(void* userdata, struct Transform3D* out
 static void glplugin_matrix3d_projectionmatrix(void* userdata, struct Transform3D* out);
 static void glplugin_matrix3d_viewprojmatrix(void* userdata, struct Transform3D* out);
 static void glplugin_matrix3d_inv_viewmatrix(void* userdata, struct Transform3D* out);
-static size_t glplugin_texture_id(void* userdata);
+static unsigned int glplugin_texture_id(void* userdata);
 static void glplugin_texture_size(void* userdata, size_t* out);
 static uint8_t glplugin_texture_compare(void* userdata, size_t x, size_t y, size_t len, const unsigned char* data);
 static uint8_t* glplugin_texture_data(void* userdata, size_t x, size_t y);
 static void glplugin_camera_position(void* userdata, double* out);
 static void glplugin_gameview_size(void* userdata, int* w, int* h);
-static void glplugin_surface_init(struct SurfaceFunctions* out, unsigned int width, unsigned int height, const void* data);
+static void glplugin_surface_init(struct SurfaceFunctions* functions, unsigned int width, unsigned int height, const void* data);
 static void glplugin_surface_destroy(void* userdata);
 static void glplugin_surface_resize(void* userdata, unsigned int width, unsigned int height);
 static void glplugin_surface_clear(void* userdata, double r, double g, double b, double a);
@@ -345,9 +345,9 @@ static uint8_t glplugin_shaderprogram_init(struct ShaderProgramFunctions* out, v
 static void glplugin_shader_destroy(void* userdata);
 static void glplugin_shaderprogram_destroy(void* userdata);
 static uint8_t glplugin_shaderprogram_set_attribute(void* userdata, uint8_t attribute, uint8_t type_width, uint8_t type_is_signed, uint8_t type_is_float, uint8_t size, uint32_t offset, uint32_t stride);
-static void glplugin_shaderprogram_set_uniform_floats(void* userdata, int location, uint8_t count, double* values);
-static void glplugin_shaderprogram_set_uniform_ints(void* userdata, int location, uint8_t count, int* values);
-static void glplugin_shaderprogram_set_uniform_matrix(void* userdata, int location, uint8_t transpose, uint8_t size, double* values);
+static void glplugin_shaderprogram_set_uniform_floats(void* userdata, int location, uint8_t count, const double* values);
+static void glplugin_shaderprogram_set_uniform_ints(void* userdata, int location, uint8_t count, const int* values);
+static void glplugin_shaderprogram_set_uniform_matrix(void* userdata, int location, uint8_t transpose, uint8_t size, const double* values);
 static void glplugin_shaderprogram_set_uniform_surface(void* userdata, int location, void* target);
 static void glplugin_shaderprogram_set_uniform_depthbuffer(void* userdata, void* event, int location);
 static void glplugin_shaderprogram_drawtosurface(void* userdata, void* surface_, void* buffer_, uint32_t count);
@@ -369,10 +369,10 @@ static void drawelements_handle_3d_normal(GLsizei count, const unsigned short* i
 static void drawelements_handle_3d_iconrender(GLsizei count, const unsigned short* indices, struct GLContext* c, const struct GLAttrBinding* attributes, GLint draw_tex);
 
 #define MAX_TEXTURE_UNITS 4096 // would be nice if there was a way to query this at runtime, but it would be awkward to set up
-#define BUFFER_LIST_CAPACITY 256 * 256
+#define BUFFER_LIST_CAPACITY ((size_t)256 * (size_t)256)
 #define TEXTURE_LIST_CAPACITY 256
-#define PROGRAM_LIST_CAPACITY 256 * 8
-#define VAO_LIST_CAPACITY 256 * 256
+#define PROGRAM_LIST_CAPACITY ((size_t)256 * (size_t)8)
+#define VAO_LIST_CAPACITY ((size_t)256 * (size_t)256)
 #define CONTEXTS_CAPACITY 64 // not growable so we just have to hard-code a number and hope it's enough forever
 #define GAME_MINIMAP_BIG_SIZE 2048
 #define GAME_ITEM_ICON_SIZE 64
@@ -553,7 +553,7 @@ struct PluginProgramUniform {
 };
 
 static int uniform_compare(const void* a, const void* b, void* udata) {
-    return (*(GLuint*)a) - (*(GLuint*)b);
+    return ((int)*(GLuint*)a) - ((int)*(GLuint*)b);
 }
 
 static uint64_t uniform_hash(const void* item, uint64_t seed0, uint64_t seed1) {
@@ -592,7 +592,7 @@ static void uniform_upload(const struct PluginProgramUniform* uniform, uint32_t*
         case 2:
             gl.ActiveTexture(GL_TEXTURE0 + *active_texture);
             lgl->BindTexture(GL_TEXTURE_2D, uniform->sub.sampler);
-            gl.Uniform1i(uniform->location, *active_texture);
+            gl.Uniform1i(uniform->location, (GLint)*active_texture);
             *active_texture += 1;
             break;
     }
@@ -705,16 +705,16 @@ static uint8_t attr_get_binding(struct GLContext* c, const struct GLAttrBinding*
                 memcpy(out, ptr, num_out * sizeof(float));
                 break;
             case GL_UNSIGNED_BYTE:
-                for (size_t i = 0; i < num_out; i += 1) out[i] = ((float)*(uint8_t*)(ptr + i)) / 255.0;
+                for (size_t i = 0; i < num_out; i += 1) out[i] = ((float)*(uint8_t*)(ptr + i)) / 255.0f;
                 break;
             case GL_UNSIGNED_SHORT:
-                for (size_t i = 0; i < num_out; i += 1) out[i] = ((float)*(uint16_t*)(ptr + (i * 2))) / 65535.0;
+                for (size_t i = 0; i < num_out; i += 1) out[i] = ((float)*(uint16_t*)(ptr + (i * 2))) / 65535.0f;
                 break;
             case GL_UNSIGNED_INT:
-                for (size_t i = 0; i < num_out; i += 1) out[i] = ((float)*(uint32_t*)(ptr + (i * 4))) / 4294967295.0;
+                for (size_t i = 0; i < num_out; i += 1) out[i] = ((float)*(uint32_t*)(ptr + (i * 4))) / 4294967295.0f;
                 break;
             case GL_BYTE:
-                for (size_t i = 0; i < num_out; i += 1) out[i] = ((((float)*(int8_t*)(ptr + i)) + 128.0) * 2.0 / 255.0) - 1.0;
+                for (size_t i = 0; i < num_out; i += 1) out[i] = ((((float)*(int8_t*)(ptr + i)) + 128.0f) * 2.0f / 255.0f) - 1.0f;
                 break;
             default:
                 printf("warning: unsupported normalise type %u\n", binding->type);
@@ -749,7 +749,7 @@ static uint8_t attr_get_binding_int(struct GLContext* c, const struct GLAttrBind
                 for (size_t i = 0; i < num_out; i += 1) out[i] = (int32_t)*(int16_t*)(ptr + (i * 2));
                 break;
             case GL_INT:
-                for (size_t i = 0; i < num_out; i += 1) out[i] = (int32_t)*(int32_t*)(ptr + (i * 4));
+                for (size_t i = 0; i < num_out; i += 1) out[i] = *(int32_t*)(ptr + (i * 4));
                 break;
             default:
                 return 0;
@@ -761,11 +761,11 @@ static uint8_t attr_get_binding_int(struct GLContext* c, const struct GLAttrBind
 }
 
 static int glhashmap_compare(const void* a, const void* b, void* udata) {
-    return (**(GLuint**)a) - (**(GLuint**)b);
+    return ((int)**(GLuint**)a) - ((int)**(GLuint**)b);
 }
 
 static uint64_t glhashmap_hash(const void* item, uint64_t seed0, uint64_t seed1) {
-    const GLuint* const* const id = item;
+    const GLuint* const* const id = (const GLuint* const*)item;
     return hashmap_sip(*id, sizeof(GLuint), seed0, seed1);
 }
 
@@ -851,7 +851,7 @@ static GLenum buffer_binding_enum(GLuint target) {
 static void* map_get(struct HashMap* map, GLuint index) {
     const GLuint* const index_ptr = &index;
     _bolt_rwlock_lock_read(&map->rwlock);
-    void* const* const val = (void**)hashmap_get(map->map, &index_ptr);
+    void* const* const val = (void**)hashmap_get(map->map, (const void*)&index_ptr);
     void* const ret = val ? *val : NULL;
     _bolt_rwlock_unlock_read(&map->rwlock);
     return ret;
@@ -873,8 +873,8 @@ static struct GLVertexArray* context_get_vao(const struct GLContext* c, GLuint i
     return map_get(c->vaos, index);
 }
 
-#define CONTEXT_GET_TEX_BINDING(C, INDEX, NAME) (context_get_texture(C, C->texture_units[INDEX].NAME))
-#define CONTEXT_GET_TEX_CURRENT(C, NAME) (CONTEXT_GET_TEX_BINDING(C, C->active_texture, NAME))
+#define CONTEXT_GET_TEX_BINDING(C, INDEX, NAME) (context_get_texture(C, (C)->texture_units[INDEX].NAME))
+#define CONTEXT_GET_TEX_CURRENT(C, NAME) (CONTEXT_GET_TEX_BINDING(C, (C)->active_texture, NAME))
 
 static void attr_set_binding(struct GLContext* c, struct GLAttrBinding* binding, unsigned int buffer, int size, const void* offset, unsigned int stride, uint32_t type, uint8_t normalise) {
     binding->buffer = context_get_buffer(c, buffer);
@@ -893,7 +893,7 @@ static void bone_index_transform(struct GLContext* c, const struct GLArrayBuffer
         *transforms_ubo = context_get_buffer(c, ubo_index);
     }
     const uint8_t* ubo_transforms_buf = (uint8_t*)((*transforms_ubo)->data);
-    const float* values = (float*)(ubo_transforms_buf + c->bound_program->offset_uBoneTransforms) + (bone_id * 12);
+    const float* values = (float*)(ubo_transforms_buf + c->bound_program->offset_uBoneTransforms) + ((ptrdiff_t)bone_id * 12);
     out->matrix[0] = (double)values[0];
     out->matrix[1] = (double)values[1];
     out->matrix[2] = (double)values[2];
@@ -916,11 +916,12 @@ static void bone_index_transform(struct GLContext* c, const struct GLArrayBuffer
 static void multiply_transforms(const struct Transform3D* left, const struct Transform3D* right, struct Transform3D* out) {
     for (size_t row = 0; row < 4; row += 1) {
         for (size_t col = 0; col < 4; col += 1) {
-            out->matrix[4 * row + col] =
-                (left->matrix[row * 4    ] * right->matrix[col     ]) +
-                (left->matrix[row * 4 + 1] * right->matrix[col + 4 ]) +
-                (left->matrix[row * 4 + 2] * right->matrix[col + 8 ]) +
-                (left->matrix[row * 4 + 3] * right->matrix[col + 12]);
+            const size_t r = row * 4;
+            out->matrix[r + col] =
+                (left->matrix[r] * right->matrix[col]) +
+                (left->matrix[r + 1] * right->matrix[col + 4]) +
+                (left->matrix[r + 2] * right->matrix[col + 8]) +
+                (left->matrix[r + 3] * right->matrix[col + 12]);
         }
     }
 }
@@ -987,12 +988,12 @@ static void draw_gameview_overlay(const struct GLContext* c) {
     gl.UseProgram(program_direct_screen.id);
     lgl->BindTexture(GL_TEXTURE_2D, gameview_overlay_tex);
     gl.BindVertexArray(program_direct_vao);
-    gl.Uniform1i(program_direct_screen.sampler, c->active_texture);
+    gl.Uniform1i(program_direct_screen.sampler, (GLint)c->active_texture);
     gl.Uniform4i(program_direct_screen.d_xywh, c->game_view_x, c->game_view_y, c->game_view_w, c->game_view_h);
     gl.Uniform4i(program_direct_screen.s_xywh, 0, 0, gameview_overlay_width, gameview_overlay_height);
-    gl.Uniform4i(program_direct_screen.src_wh_dest_wh, gameview_overlay_width, gameview_overlay_height, gl_width, gl_height);
-    gl.Uniform4f(program_direct_screen.rgba, 1.0, 1.0, 1.0, 1.0);
-    lgl->Viewport(0, 0, gl_width, gl_height);
+    gl.Uniform4i(program_direct_screen.src_wh_dest_wh, gameview_overlay_width, gameview_overlay_height, (GLint)gl_width, (GLint)gl_height);
+    gl.Uniform4f(program_direct_screen.rgba, 1.0f, 1.0f, 1.0f, 1.0f);
+    lgl->Viewport(0, 0, (GLsizei)gl_width, (GLsizei)gl_height);
     lgl->Disable(GL_DEPTH_TEST);
     lgl->Disable(GL_SCISSOR_TEST);
     lgl->Disable(GL_CULL_FACE);
@@ -1247,7 +1248,7 @@ static GLuint glCreateProgram() {
     program->is_particle = 0;
     program->is_billboard = 0;
     _bolt_rwlock_lock_write(&c->programs->rwlock);
-    hashmap_set(c->programs->map, &program);
+    hashmap_set(c->programs->map, (const void*)&program);
     _bolt_rwlock_unlock_write(&c->programs->rwlock);
     LOG("glCreateProgram end\n");
     return id;
@@ -1258,7 +1259,7 @@ static void glDeleteProgram(GLuint program) {
     struct GLContext* c = _bolt_context();
     unsigned int* ptr = &program;
     _bolt_rwlock_lock_write(&c->programs->rwlock);
-    struct GLProgram* const* p = hashmap_delete(c->programs->map, &ptr);
+    struct GLProgram* const* p = (struct GLProgram* const*)hashmap_delete(c->programs->map, (const void*)&ptr);
     free(*p);
     _bolt_rwlock_unlock_write(&c->programs->rwlock);
     gl.DeleteProgram(program);
@@ -1414,7 +1415,7 @@ static void glTexStorage2D(GLenum target, GLsizei levels, GLenum internalformat,
         struct GLTexture2D* tex = CONTEXT_GET_TEX_CURRENT(c, texture_2d);
         if (tex) {
             free(tex->data);
-            tex->data = calloc(width * height * 4, sizeof(*tex->data));
+            tex->data = calloc((size_t)width * (size_t)height * 4, sizeof(*tex->data));
             tex->internalformat = internalformat;
             tex->width = width;
             tex->height = height;
@@ -1432,7 +1433,7 @@ static void glTexStorage2DMultisample(GLenum target, GLsizei levels, GLenum inte
         struct GLTexture2D* tex = CONTEXT_GET_TEX_CURRENT(c, texture_2d_multisample);
         if (tex) {
             free(tex->data);
-            tex->data = calloc(width * height * 4, sizeof(*tex->data));
+            tex->data = calloc((size_t)width * (size_t)height * 4, sizeof(*tex->data));
             tex->internalformat = internalformat;
             tex->width = width;
             tex->height = height;
@@ -1463,7 +1464,7 @@ static void glGenBuffers(GLsizei n, GLuint* buffers) {
     for (GLsizei i = 0; i < n; i += 1) {
         struct GLArrayBuffer* buffer = calloc(1, sizeof(struct GLArrayBuffer));
         buffer->id = buffers[i];
-        hashmap_set(c->buffers->map, &buffer);
+        hashmap_set(c->buffers->map, (const void*)&buffer);
     }
     _bolt_rwlock_unlock_write(&c->buffers->rwlock);
     LOG("glGenBuffers end\n");
@@ -1492,7 +1493,7 @@ static void glDeleteBuffers(GLsizei n, const GLuint* buffers) {
     _bolt_rwlock_lock_write(&c->buffers->rwlock);
     for (GLsizei i = 0; i < n; i += 1) {
         const GLuint* ptr = &buffers[i];
-        struct GLArrayBuffer* const* buffer = hashmap_delete(c->buffers->map, &ptr);
+        struct GLArrayBuffer* const* buffer = (struct GLArrayBuffer* const*)hashmap_delete(c->buffers->map, (const void*)&ptr);
         free((*buffer)->data);
         free((*buffer)->mapping);
         free(*buffer);
@@ -1538,7 +1539,7 @@ static void glCompressedTexSubImage2D(GLenum target, GLint level, GLint xoffset,
     for (size_t ii = 0; ii < ((size_t)width * (size_t)height); ii += input_stride) {
         const uint8_t* ptr = (uint8_t*)data + ii;
         const uint8_t* cptr = is_dxt1 ? ptr : (ptr + 8);
-        uint8_t* out_ptr = tex->data + (out_yoffset * tex->width * 4) + (out_xoffset * 4);
+        uint8_t* out_ptr = tex->data + ((ptrdiff_t)out_yoffset * (ptrdiff_t)tex->width * 4) + ((ptrdiff_t)out_xoffset * 4);
         uint16_t c0 = cptr[0] + (cptr[1] << 8);
         uint16_t c1 = cptr[2] + (cptr[3] << 8);
         uint8_t c0_rgb[3];
@@ -1663,7 +1664,7 @@ static void glCopyImageSubData(
             if (srcX == 0 && srcY == 0 && dstX == 0 && dstY == 0 && src->width == dst->width && src->height == dst->height && src->width == srcWidth && src->height == srcHeight) {
                 printf("copy to depth-of-field tex from tex %i\n", src->id);
                 c->does_blit_3d_target = true;
-                c->target_3d_tex = src->id;
+                c->target_3d_tex = (GLint)src->id;
             }
         } else if (!src->icon.is_big_icon && src->icon.model_count && dst->width > GAME_ITEM_ICON_SIZE && dst->height > GAME_ITEM_ICON_SIZE) {
             if (!dst->icons) {
@@ -1682,7 +1683,7 @@ static void glCopyImageSubData(
             src->icon.model_count = 0;
         } else if (src->id != c->target_3d_tex) {
             for (GLsizei i = 0; i < srcHeight; i += 1) {
-                memcpy(dst->data + (dstY * dst->width * 4) + (dstX * 4), src->data + (srcY * src->width * 4) + (srcX * 4), srcWidth * 4);
+                memcpy(dst->data + ((ptrdiff_t)dstY * (ptrdiff_t)dst->width * 4) + ((ptrdiff_t)dstX * 4), src->data + ((ptrdiff_t)srcY * (ptrdiff_t)src->width * 4) + ((ptrdiff_t)srcX * 4), (size_t)srcWidth * 4);
             }
         }
     }
@@ -1740,11 +1741,10 @@ static void* glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length,
         }
         LOG("glMapBufferRange end (intercepted)\n");
         return buffer->mapping;
-    } else {
-        void* ret = gl.MapBufferRange(target, offset, length, access);
-        LOG("glMapBufferRange end (not intercepted)\n");
-        return ret;
     }
+    void* ret = gl.MapBufferRange(target, offset, length, access);
+    LOG("glMapBufferRange end (not intercepted)\n");
+    return ret;
 }
 
 static GLboolean glUnmapBuffer(GLuint target) {
@@ -1765,11 +1765,10 @@ static GLboolean glUnmapBuffer(GLuint target) {
         buffer->mapping = NULL;
         LOG("glUnmapBuffer end (intercepted)\n");
         return 1;
-    } else {
-        GLboolean ret = gl.UnmapBuffer(target);
-        LOG("glUnmapBuffer end (not intercepted)\n");
-        return ret;
     }
+    GLboolean ret = gl.UnmapBuffer(target);
+    LOG("glUnmapBuffer end (not intercepted)\n");
+    return ret;
 }
 
 static void glBufferStorage(GLenum target, GLsizeiptr size, const void* data, GLbitfield flags) {
@@ -1833,7 +1832,7 @@ static void glGenVertexArrays(GLsizei n, GLuint* arrays) {
         struct GLVertexArray* array = malloc(sizeof(struct GLVertexArray));
         array->id = arrays[i];
         array->attributes = calloc(attrib_count, sizeof(struct GLAttrBinding));
-        hashmap_set(c->vaos->map, &array);
+        hashmap_set(c->vaos->map, (const void*)&array);
     }
     _bolt_rwlock_unlock_write(&c->vaos->rwlock);
     LOG("glGenVertexArrays end\n");
@@ -1845,7 +1844,7 @@ static void glDeleteVertexArrays(GLsizei n, const GLuint* arrays) {
     _bolt_rwlock_lock_write(&c->vaos->rwlock);
     for (GLsizei i = 0; i < n; i += 1) {
         const GLuint* ptr = &arrays[i];
-        struct GLVertexArray* const* vao = hashmap_delete(c->vaos->map, &ptr);
+        struct GLVertexArray* const* vao = (struct GLVertexArray* const*)hashmap_delete(c->vaos->map, (const void*)&ptr);
         free((*vao)->attributes);
         free(*vao);
     }
@@ -1890,7 +1889,7 @@ static void glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1
         c->does_blit_3d_target = false;
         c->depth_of_field_enabled = false;
         c->game_view_x = dstX0;
-        c->game_view_y = gl_height - dstY1;
+        c->game_view_y = (GLint)gl_height - dstY1;
         printf("new game_view_part_framebuffer %u...\n", c->current_read_framebuffer);
     } else if (srcX0 == 0 && dstX0 == 0 && srcY0 == 0 && dstY0 == 0 && srcX1 == dstX1 && srcY1 == dstY1 && c->current_draw_framebuffer != 0) {
         struct GLTexture2D* target_tex = context_get_texture(c, draw_tex_id);
@@ -1986,7 +1985,7 @@ void _bolt_gl_onSwapBuffers(uint32_t window_width, uint32_t window_height) {
     gl_width = window_width;
     gl_height = window_height;
     if (egl_main_context_setup_pending) {
-        if ((uintptr_t)(_bolt_context()->id) == egl_main_context) {
+        if (_bolt_context()->id == egl_main_context) {
             egl_main_context_setup_pending = 0;
             gl_init();
             _bolt_plugin_init(&plugin_managed_functions);
@@ -2049,7 +2048,7 @@ void _bolt_gl_onDestroyContext(void* context) {
     context_destroy(context);
 }
 
-void _bolt_gl_onGenTextures(GLsizei n, GLuint* textures) {
+void _bolt_gl_onGenTextures(GLsizei n, const GLuint* textures) {
     struct GLContext* c = _bolt_context();
     _bolt_rwlock_lock_write(&c->textures->rwlock);
     for (GLsizei i = 0; i < n; i += 1) {
@@ -2061,7 +2060,7 @@ void _bolt_gl_onGenTextures(GLsizei n, GLuint* textures) {
         tex->is_minimap_tex_big = false;
         tex->is_minimap_tex_small = false;
         tex->is_multisample = false;
-        hashmap_set(c->textures->map, &tex);
+        hashmap_set(c->textures->map, (const void*)&tex);
     }
     _bolt_rwlock_unlock_write(&c->textures->rwlock);
 }
@@ -2139,7 +2138,7 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
             struct GLTexture2D* source_tex = CONTEXT_GET_TEX_BINDING(c, source_tex_unit, texture_2d);
             if (source_tex) {
                 if (c->current_draw_framebuffer == 0 && c->game_view_sSceneHDRTex != source_tex->id) {
-                    c->game_view_sSceneHDRTex = source_tex->id;
+                    c->game_view_sSceneHDRTex = (GLint)source_tex->id;
                     c->target_3d_tex = c->game_view_sSceneHDRTex;
                     c->game_view_x = 0;
                     c->game_view_y = 0;
@@ -2150,7 +2149,7 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                     c->depth_of_field_enabled = false;
                     printf("new direct sSceneHDRTex %i\n", c->target_3d_tex);
                 } else if (c->recalculate_sSceneHDRTex && !c->depth_of_field_enabled && (c->game_view_part_framebuffer == c->current_draw_framebuffer || c->game_view_sSourceTex == target_tex_id)) {
-                    c->game_view_sSceneHDRTex = source_tex->id;
+                    c->game_view_sSceneHDRTex = (GLint)source_tex->id;
                     c->target_3d_tex = c->game_view_sSceneHDRTex;
                     c->game_view_w = source_tex->width;
                     c->game_view_h = source_tex->height;
@@ -2164,7 +2163,7 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                 if (c->game_view_sSceneHDRTex == source_tex->id && c->depth_tex > 0 && !c->recalculate_depth_tex) {
                     update_gameview_overlay(c);
                     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, gameview_overlay_fb);
-                    lgl->ClearColor(0.0, 0.0, 0.0, 0.0);
+                    lgl->ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
                     lgl->Clear(GL_COLOR_BUFFER_BIT);
                     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, c->current_draw_framebuffer);
 
@@ -2194,12 +2193,12 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
             if (source_tex) {
                 if (c->current_draw_framebuffer && c->bound_program->loc_sBlurFarTex != -1) {
                     if (c->depth_of_field_enabled || c->game_view_sSceneHDRTex != target_tex_id) return;
-                    c->depth_of_field_sSourceTex = source_tex->id;
+                    c->depth_of_field_sSourceTex = (GLint)source_tex->id;
                     c->depth_of_field_enabled = true;
                     printf("new depth-of-field sSourceTex %i...\n", c->depth_of_field_sSourceTex);
                 } else if (c->current_draw_framebuffer == 0 && c->game_view_sSourceTex != source_tex->id) {
                     c->game_view_sSceneHDRTex = -1;
-                    c->game_view_sSourceTex = source_tex->id;
+                    c->game_view_sSourceTex = (GLint)source_tex->id;
                     c->does_blit_3d_target = false;
                     c->depth_of_field_enabled = false;
                     c->game_view_x = 0;
@@ -2207,7 +2206,7 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                     c->recalculate_sSceneHDRTex = true;
                     printf("new direct sSourceTex %i...\n", c->game_view_sSourceTex);
                 } else if (c->recalculate_sSceneHDRTex && c->game_view_part_framebuffer == c->current_draw_framebuffer) {
-                    c->game_view_sSourceTex = source_tex->id;
+                    c->game_view_sSourceTex = (GLint)source_tex->id;
                     printf("new sSourceTex %i...\n", c->game_view_sSourceTex);
                 } else if (target_tex && source_tex->icon.model_count && source_tex->width == GAME_ITEM_BIGICON_SIZE && source_tex->height == GAME_ITEM_BIGICON_SIZE && target_tex->width == GAME_ITEM_BIGICON_SIZE && target_tex->height == GAME_ITEM_BIGICON_SIZE) {
                     target_tex->icon = source_tex->icon;
@@ -2218,7 +2217,7 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
             gl.GetUniformiv(c->bound_program->id, c->bound_program->loc_sTexture, &source_tex_unit);
             struct GLTexture2D* source_tex = CONTEXT_GET_TEX_BINDING(c, source_tex_unit, recent);
             if (source_tex && source_tex->width == c->game_view_w && source_tex->height == c->game_view_h) {
-                c->player_model_tex = source_tex->id;
+                c->player_model_tex = (GLint)source_tex->id;
                 player_model_tex_seen = true;
             }
         }
@@ -2246,9 +2245,9 @@ void _bolt_gl_onTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint y
         struct GLTexture2D* tex = CONTEXT_GET_TEX_CURRENT(c, texture_2d);
         if (tex && !(xoffset < 0 || yoffset < 0 || xoffset + width > tex->width || yoffset + height > tex->height)) {
             for (GLsizei y = 0; y < height; y += 1) {
-                uint8_t* dest_ptr = tex->data + ((tex->width * (y + yoffset)) + xoffset) * 4;
-                const uint8_t* src_ptr = (uint8_t*)pixels + (width * y * 4);
-                memcpy(dest_ptr, src_ptr, width * 4);
+                uint8_t* dest_ptr = tex->data + ((((ptrdiff_t)tex->width * ((ptrdiff_t)y + yoffset)) + xoffset) * 4);
+                const uint8_t* src_ptr = (const uint8_t*)pixels + ((ptrdiff_t)width * (ptrdiff_t)y * 4);
+                memcpy(dest_ptr, src_ptr, (size_t)width * 4);
             }
         }
     }
@@ -2259,7 +2258,7 @@ void _bolt_gl_onDeleteTextures(GLsizei n, const GLuint* textures) {
     _bolt_rwlock_lock_write(&c->textures->rwlock);
     for (GLsizei i = 0; i < n; i += 1) {
         const GLuint* ptr = &textures[i];
-        struct GLTexture2D* const* texture = hashmap_delete(c->textures->map, &ptr);
+        struct GLTexture2D* const* texture = (struct GLTexture2D* const*)hashmap_delete(c->textures->map, (const void*)&ptr);
         free((*texture)->data);
         if ((*texture)->icons) {
             size_t iter = 0;
@@ -2408,7 +2407,7 @@ static void drawelements_handle_particles(GLsizei count, const unsigned short* i
     struct GLPluginDrawElementsVertexParticlesUserData vertex_userdata;
     vertex_userdata.c = c;
     vertex_userdata.indices = indices;
-    vertex_userdata.atlas_scale = roundf(atlas_scale);
+    vertex_userdata.atlas_scale = (int)roundf(atlas_scale);
     vertex_userdata.settings_atlas = tex_settings;
     vertex_userdata.origin = &attributes[c->bound_program->loc_aParticleOrigin_CreationTime];
     vertex_userdata.offset = &attributes[c->bound_program->loc_aParticleOffset];
@@ -2418,14 +2417,14 @@ static void drawelements_handle_particles(GLsizei count, const unsigned short* i
     vertex_userdata.colour = &attributes[c->bound_program->loc_aVertexColour];
     vertex_userdata.uv_animation_data = &attributes[c->bound_program->loc_aParticleUVAnimationData];
     vertex_userdata.camera_position = (float*)(ubo_view_buf + c->bound_program->offset_uCameraPosition);
-    vertex_userdata.animation_time = seconds;
+    vertex_userdata.animation_time = (float)seconds;
     for (size_t i = 0; i < 8; i += 1) {
         // the last range isn't actually used for anything, so no point copying it or having space for it
         if (i < 7) {
-            vertex_userdata.ranges[i * 2] = ranges[i * 4];
-            vertex_userdata.ranges[i * 2 + 1] = ranges[i * 4 + 1];
+            vertex_userdata.ranges[i * 2] = (GLint)ranges[i * 4];
+            vertex_userdata.ranges[(i * 2) + 1] = (GLint)ranges[(i * 4) + 1];
         }
-        vertex_userdata.transform[i] = &transforms[i * (4 * 4)];
+        vertex_userdata.transform[i] = &transforms[i * 16];
     }
 
     struct GLPluginDrawElementsMatrixParticlesUserData matrix_userdata;
@@ -2492,7 +2491,7 @@ static void drawelements_handle_billboard(GLsizei count, const unsigned short* i
     struct GLPluginDrawElementsVertexBillboardUserData vertex_userdata;
     vertex_userdata.c = c;
     vertex_userdata.indices = indices;
-    vertex_userdata.atlas_scale = roundf(atlas_scale);
+    vertex_userdata.atlas_scale = (int)roundf(atlas_scale);
     vertex_userdata.settings_atlas = tex_settings;
     vertex_userdata.vertex_position = &attributes[c->bound_program->loc_aVertexPositionDepthOffset];
     vertex_userdata.billboard_size = &attributes[c->bound_program->loc_aBillboardSize];
@@ -2552,14 +2551,14 @@ static void drawelements_handle_2d_renderminimap(const struct GLTexture2D* tex, 
     if (!attr_get_binding_int(c, position, 2, 2, xy2)) return;
     attr_get_binding(c, uv, 0, 2, uv0);
     attr_get_binding(c, uv, 2, 2, uv2);
-    const int16_t x1 = (int16_t)roundf(uv0[0] * tex->width);
-    const int16_t x2 = (int16_t)roundf(uv2[0] * tex->width);
-    const int16_t y1 = (int16_t)roundf(uv2[1] * tex->height);
-    const int16_t y2 = (int16_t)roundf(uv0[1] * tex->height);
-    const float screen_height_float = roundf(2.0 / projection_matrix[5]);
+    const int16_t x1 = (int16_t)roundf(uv0[0] * (float)tex->width);
+    const int16_t x2 = (int16_t)roundf(uv2[0] * (float)tex->width);
+    const int16_t y1 = (int16_t)roundf(uv2[1] * (float)tex->height);
+    const int16_t y2 = (int16_t)roundf(uv0[1] * (float)tex->height);
+    const uint32_t screen_height_float = (uint32_t)roundf(2.0f / projection_matrix[5]);
     const struct RenderMinimapEvent event = {
-        .screen_width = roundf(2.0 / projection_matrix[0]),
-        .screen_height = screen_height_float,
+        .screen_width = (uint32_t)roundf(2.0f / projection_matrix[0]),
+        .screen_height = (uint32_t)screen_height_float,
         .source_x = x1,
         .source_y = y1,
         .source_w = x2 - x1,
@@ -2647,8 +2646,8 @@ static void drawelements_handle_2d_bigicon(const unsigned short* indices, struct
     attr_get_binding_int(c, binding, indices[2], 2, xy2);
     struct RenderIconEvent event;
     event.icon = &tex->icon;
-    event.screen_width = roundf(2.0 / projection_matrix[0]);
-    event.screen_height = roundf(2.0 / projection_matrix[5]);
+    event.screen_width = (uint32_t)roundf(2.0f / projection_matrix[0]);
+    event.screen_height = (uint32_t)roundf(2.0f / projection_matrix[5]);
     event.target_x = (int16_t)xy2[0];
     event.target_y = (int16_t)((int32_t)event.screen_height - xy2[1]);
     event.target_w = (uint16_t)(xy0[0] - xy2[0]);
@@ -2675,13 +2674,13 @@ static void drawelements_handle_2d_normal(GLsizei count, const unsigned short* i
     vertex_userdata.atlas_size = &attributes[c->bound_program->loc_aTextureUVAtlasExtents];
     vertex_userdata.tex_uv = &attributes[c->bound_program->loc_aTextureUV];
     vertex_userdata.colour = &attributes[c->bound_program->loc_aVertexColour];
-    vertex_userdata.screen_height = roundf(2.0 / projection_matrix[5]);
+    vertex_userdata.screen_height = (uint32_t)roundf(2.0f / projection_matrix[5]);
 
     struct GLPluginTextureUserData tex_userdata;
     tex_userdata.tex = tex;
 
     struct RenderBatch2D batch;
-    batch.screen_width = roundf(2.0 / projection_matrix[0]);
+    batch.screen_width = (uint32_t)roundf(2.0f / projection_matrix[0]);
     batch.screen_height = vertex_userdata.screen_height;
     batch.index_count = count;
     batch.vertices_per_icon = 6;
@@ -2707,11 +2706,13 @@ static void drawelements_handle_2d_normal(GLsizei count, const unsigned short* i
             float wh[2];
             attr_get_binding(c, vertex_userdata.atlas_min, indices[i], 2, xy);
             attr_get_binding(c, vertex_userdata.atlas_size, indices[i], 2, wh);
+            const float texw = (float)tex->width;
+            const float texh = (float)tex->height;
             const struct Icon dummy_icon = {
-                .x = (uint16_t)roundf(xy[0] * tex->width),
-                .y = (uint16_t)roundf(xy[1] * tex->height),
-                .w = (uint16_t)roundf(fabs(wh[0]) * tex->width),
-                .h = (uint16_t)roundf(fabs(wh[1]) * tex->height),
+                .x = (uint16_t)roundf(xy[0] * texw),
+                .y = (uint16_t)roundf(xy[1] * texh),
+                .w = (uint16_t)roundf(fabsf(wh[0]) * texw),
+                .h = (uint16_t)roundf(fabsf(wh[1]) * texh),
             };
             const struct Icon* icon = hashmap_get(tex->icons, &dummy_icon);
             if (icon) {
@@ -2782,7 +2783,7 @@ static void drawelements_handle_3d_normal(GLsizei count, const unsigned short* i
     struct GLPluginDrawElementsVertex3DUserData vertex_userdata;
     vertex_userdata.c = c;
     vertex_userdata.indices = indices;
-    vertex_userdata.atlas_scale = roundf(atlas_scale);
+    vertex_userdata.atlas_scale = (int)roundf(atlas_scale);
     vertex_userdata.settings_atlas = tex_settings;
     vertex_userdata.xy_xz = &attributes[c->bound_program->loc_aMaterialSettingsSlotXY_TilePositionXZ];
     vertex_userdata.xyz_bone = &attributes[c->bound_program->loc_aVertexPosition_BoneLabel];
@@ -2898,7 +2899,7 @@ DEFNORMALMATRIXGETTERS(TYPE, STRUCT)
 static void xywh_from_meta_atlas(const struct GLTexture2D* settings_atlas, size_t slot_x, size_t slot_y, int scale, int32_t* out) {
     // this is pretty wild
     const uint8_t* settings_ptr = settings_atlas->data + (slot_y * settings_atlas->width * 4 * 4) + (slot_x * 3 * 4);
-    const uint8_t bitmask = *(settings_ptr + (settings_atlas->width * 2 * 4) + 7);
+    const uint8_t bitmask = *(settings_ptr + ((ptrdiff_t)settings_atlas->width * 2 * 4) + 7);
     out[0] = ((int32_t)(*settings_ptr) + (bitmask & 1 ? 256 : 0)) * scale;
     out[1] = ((int32_t)*(settings_ptr + 1) + (bitmask & 2 ? 256 : 0)) * scale;
     out[2] = (int32_t)*(settings_ptr + 8) * scale;
@@ -2914,7 +2915,7 @@ static void normalise(float* values) {
 }
 
 // like the glsl function, operates on vec3
-static void cross(float* x, float* y, float* out) {
+static void cross(const float* x, const float* y, float* out) {
     out[0] = (x[1] * y[2]) - (y[1] * x[2]);
     out[1] = (x[2] * y[0]) - (y[2] * x[0]);
     out[2] = (x[0] * y[1]) - (y[0] * x[1]);
@@ -2923,7 +2924,7 @@ static void cross(float* x, float* y, float* out) {
 static const GLfloat* particles_get_transform(unsigned short vertex, const struct GLProgram* program, const struct GLPluginDrawElementsVertexParticlesUserData* userdata) {
     size_t i;
     for (i = 0; i < 7; i += 1) {
-        if (vertex >= userdata->ranges[i * 2] && vertex < userdata->ranges[i * 2 + 1]) break;
+        if (vertex >= userdata->ranges[i * 2] && vertex < userdata->ranges[(i * 2) + 1]) break;
     }
     return userdata->transform[i];
 }
@@ -2935,7 +2936,7 @@ static void surface_init_buffers(struct PluginSurfaceUserdata* userdata) {
     lgl->GenTextures(1, &userdata->renderbuffer);
     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, userdata->framebuffer);
     lgl->BindTexture(GL_TEXTURE_2D, userdata->renderbuffer);
-    gl.TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, userdata->width, userdata->height);
+    gl.TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, (GLsizei)userdata->width, (GLsizei)userdata->height);
     lgl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     lgl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     lgl->TexParameteri(GL_TEXTURE_2D,  GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -2959,10 +2960,10 @@ static void surface_draw(const struct GLContext* c, const struct PluginSurfaceUs
     lgl->BindTexture(GL_TEXTURE_2D, userdata->renderbuffer);
     gl.BindVertexArray(program_direct_vao);
     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, target_fb);
-    gl.Uniform1i(program->sampler, c->active_texture);
+    gl.Uniform1i(program->sampler, (GLint)c->active_texture);
     gl.Uniform4i(program->d_xywh, dx, dy, dw, dh);
     gl.Uniform4i(program->s_xywh, sx, sy, sw, sh);
-    gl.Uniform4i(program->src_wh_dest_wh, userdata->width, userdata->height, target_width, target_height);
+    gl.Uniform4i(program->src_wh_dest_wh, (GLint)userdata->width, (GLint)userdata->height, target_width, target_height);
     gl.Uniform4fv(program->rgba, 1, userdata->rgba);
     lgl->Viewport(0, 0, target_width, target_height);
     lgl->Disable(GL_DEPTH_TEST);
@@ -2985,7 +2986,7 @@ static void surface_draw(const struct GLContext* c, const struct PluginSurfaceUs
     gl.UseProgram(c->bound_program ? c->bound_program->id : 0);
 }
 
-static void shaderprogram_draw(const struct PluginProgramUserdata* program, const struct PluginShaderBufferUserdata* buffer, uint32_t count, GLuint target_fb, GLsizei width, GLsizei height) {
+static void shaderprogram_draw(const struct PluginProgramUserdata* program, const struct PluginShaderBufferUserdata* buffer, GLsizei count, GLuint target_fb, GLsizei width, GLsizei height) {
     const struct GLContext* c = _bolt_context();
     GLint array_binding;
     lgl->GetIntegerv(GL_ARRAY_BUFFER_BINDING, &array_binding);
@@ -3003,9 +3004,9 @@ static void shaderprogram_draw(const struct PluginProgramUserdata* program, cons
             const struct PluginProgramAttrBinding* binding = &program->bindings[i];
             gl.EnableVertexAttribArray(i);
             if (binding->is_double) {
-                gl.VertexAttribLPointer(i, binding->size, binding->type, binding->stride, (const void*)binding->offset);
+                gl.VertexAttribLPointer(i, binding->size, binding->type, (GLsizei)binding->stride, (const void*)binding->offset);
             } else {
-                gl.VertexAttribPointer(i, binding->size, binding->type, false, binding->stride, (const void*)binding->offset);
+                gl.VertexAttribPointer(i, binding->size, binding->type, false, (GLsizei)binding->stride, (const void*)binding->offset);
             }
         } else {
             gl.DisableVertexAttribArray(i);
@@ -3066,10 +3067,12 @@ static void glplugin_drawelements_vertex2d_atlas_details(size_t index, void* use
     float wh[2];
     attr_get_binding(data->c, data->atlas_min, data->indices[index], 2, xy);
     attr_get_binding(data->c, data->atlas_size, data->indices[index], 2, wh);
-    out[0] = (int32_t)roundf(xy[0] * data->atlas->width);
-    out[1] = (int32_t)roundf(xy[1] * data->atlas->height);
-    out[2] = (int32_t)roundf(fabs(wh[0]) * data->atlas->width);
-    out[3] = (int32_t)roundf(fabs(wh[1]) * data->atlas->height);
+    const float texw = (float)data->atlas->width;
+    const float texh = (float)data->atlas->height;
+    out[0] = (int32_t)roundf(xy[0] * texw);
+    out[1] = (int32_t)roundf(xy[1] * texh);
+    out[2] = (int32_t)roundf(fabsf(wh[0]) * texw);
+    out[3] = (int32_t)roundf(fabsf(wh[1]) * texh);
     *wrapx = wh[0] > 0.0;
     *wrapy = wh[1] > 0.0;
 }
@@ -3108,11 +3111,11 @@ static void glplugin_drawelements_vertex3d_xyz(size_t index, void* userdata, str
     }
 }
 
-static size_t glplugin_drawelements_vertex3d_atlas_meta(size_t index, void* userdata) {
+static uint32_t glplugin_drawelements_vertex3d_atlas_meta(size_t index, void* userdata) {
     const struct GLPluginDrawElementsVertex3DUserData* data = userdata;
     int material_xy[2];
     attr_get_binding_int(data->c, data->xy_xz, data->indices[index], 2, material_xy);
-    return ((size_t)material_xy[1] << 16) | (size_t)material_xy[0];
+    return ((uint32_t)material_xy[1] << 16) | ((uint32_t)material_xy[0] & 0xFFFF);
 }
 
 static void glplugin_drawelements_vertex3d_meta_xywh(size_t meta, void* userdata, int32_t* out) {
@@ -3187,10 +3190,10 @@ static void glplugin_drawelements_vertex3d_transform(size_t vertex, void* userda
         }
         for (size_t i = 0; i < 16; i += 1) {
             modifier.matrix[i] =
-                weighted_modifiers[0].matrix[i] * skin_weights[0] +
-                weighted_modifiers[1].matrix[i] * skin_weights[1] +
-                weighted_modifiers[2].matrix[i] * skin_weights[2] +
-                weighted_modifiers[3].matrix[i] * skin_weights[3];
+                (weighted_modifiers[0].matrix[i] * skin_weights[0]) +
+                (weighted_modifiers[1].matrix[i] * skin_weights[1]) +
+                (weighted_modifiers[2].matrix[i] * skin_weights[2]) +
+                (weighted_modifiers[3].matrix[i] * skin_weights[3]);
         }
     } else {
         bone_index_transform(data->c, &data->transforms_ubo, skin_bones[0], &modifier);
@@ -3276,18 +3279,18 @@ static void glplugin_drawelements_vertexparticles_world_offset(size_t index, voi
         normalise(up_axis);
     }
     if (velocity[0] == 0.0 && velocity[1] == 0.0 && velocity[2] == 0.0) {
-        velocity[0] = 0.0;
-        velocity[1] = 0.0;
-        velocity[2] = 1.0;
+        velocity[0] = 0.0f;
+        velocity[1] = 0.0f;
+        velocity[2] = 1.0f;
     } else {
         normalise(velocity);
     }
     float cross_product[3];
     cross(velocity, up_axis, cross_product);
     normalise(cross_product);
-    out[0] = velocity[0] * offsety2d + cross_product[0] * offsetx2d;
-    out[1] = velocity[1] * offsety2d + cross_product[1] * offsetx2d;
-    out[2] = velocity[2] * offsety2d + cross_product[2] * offsetx2d;
+    out[0] = (velocity[0] * offsety2d) + (cross_product[0] * offsetx2d);
+    out[1] = (velocity[1] * offsety2d) + (cross_product[1] * offsetx2d);
+    out[2] = (velocity[2] * offsety2d) + (cross_product[2] * offsetx2d);
 }
 
 static void glplugin_drawelements_vertexparticles_eye_offset(size_t index, void* userdata, double* out) {
@@ -3335,19 +3338,19 @@ static void glplugin_drawelements_vertexparticles_uv(size_t index, void* userdat
             attr_get_binding(data->c, data->origin, vertex, 4, origin);
             const int32_t A = uv_animation_data[1];
             const float m = data->animation_time - origin[3];
-            const float T = m * A;
+            const float T = m * (float)A;
             const int32_t p = o * s;
             const float S = floorf(T);
-            const float e = fmodf(S, p);
-            const float V = fmodf(e + 1.0, p);
-            const float h = fmodf(e, s);
+            const float e = fmodf(S, (float)p);
+            const float V = fmodf(e + 1.0f, (float)p);
+            const float h = fmodf(e, (float)s);
             const float Y = (e - h) / (float)s;
-            const float c = fmodf(V, s);
+            const float c = fmodf(V, (float)s);
             const float E = (V - c) / (float)s;
-            const float us = 1.0 / (float)s;
-            const float ds = 1.0 - us - (h / (float)s);
+            const float us = 1.0f / (float)s;
+            const float ds = 1.0f - us - (h / (float)s);
             const float dt = Y / (float)o;
-            const float rs = 1.0 - us - (c / (float)s);
+            const float rs = 1.0f - us - (c / (float)s);
             const float rt = E / (float)o;
             const float interpolation_amount = T - S;
             out[0] = ts + (ds * (1.0 - interpolation_amount)) + (rs * interpolation_amount);
@@ -3366,11 +3369,11 @@ static void glplugin_drawelements_vertexparticles_uv(size_t index, void* userdat
     }
 }
 
-static size_t glplugin_drawelements_vertexparticles_atlas_meta(size_t index, void* userdata) {
+static uint32_t glplugin_drawelements_vertexparticles_atlas_meta(size_t index, void* userdata) {
     const struct GLPluginDrawElementsVertexParticlesUserData* data = userdata;
     int material_xy[2];
     attr_get_binding_int(data->c, data->xy_rotation, data->indices[index], 2, material_xy);
-    return ((size_t)material_xy[1] << 16) | (size_t)material_xy[0];
+    return ((uint32_t)material_xy[1] << 16) | ((uint32_t)material_xy[0] & 0xFFFF);
 }
 
 static void glplugin_drawelements_vertexparticles_meta_xywh(size_t meta, void* userdata, int32_t* out) {
@@ -3424,11 +3427,11 @@ static void glplugin_drawelements_vertexbillboard_uv(size_t index, void* userdat
     out[1] = (double)xyuv[3];
 }
 
-static size_t glplugin_drawelements_vertexbillboard_atlas_meta(size_t index, void* userdata) {
+static uint32_t glplugin_drawelements_vertexbillboard_atlas_meta(size_t index, void* userdata) {
     const struct GLPluginDrawElementsVertexBillboardUserData* data = userdata;
     int material_xy[2];
     attr_get_binding_int(data->c, data->material_xy_uv, data->indices[index], 2, material_xy);
-    return ((size_t)material_xy[1] << 16) | (size_t)material_xy[0];
+    return ((uint32_t)material_xy[1] << 16) | ((uint32_t)material_xy[0] & 0xFFFF);
 }
 
 static void glplugin_drawelements_vertexbillboard_meta_xywh(size_t meta, void* userdata, int32_t* out) {
@@ -3448,7 +3451,7 @@ static void glplugin_drawelements_vertexbillboard_colour(size_t index, void* use
     out[3] = (double)rgba[3];
 }
 
-static size_t glplugin_texture_id(void* userdata) {
+static unsigned int glplugin_texture_id(void* userdata) {
     const struct GLPluginTextureUserData* data = userdata;
     return data->tex->id;
 }
@@ -3491,13 +3494,13 @@ static void glplugin_surface_init(struct SurfaceFunctions* functions, unsigned i
     userdata->width = width;
     userdata->height = height;
     for (size_t i = 0; i < 4; i += 1) {
-        userdata->rgba[i] = 1.0;
+        userdata->rgba[i] = 1.0f;
     }
     surface_init_buffers(userdata);
     if (data) {
-        lgl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        lgl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, (GLsizei)width, (GLsizei)height, GL_RGBA, GL_UNSIGNED_BYTE, data);
     } else {
-        lgl->ClearColor(0.0, 0.0, 0.0, 0.0);
+        lgl->ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         lgl->Clear(GL_COLOR_BUFFER_BIT);
     }
     functions->userdata = userdata;
@@ -3526,7 +3529,7 @@ static void glplugin_surface_resize(void* _userdata, unsigned int width, unsigne
     userdata->width = width;
     userdata->height = height;
     surface_init_buffers(userdata);
-    lgl->ClearColor(0.0, 0.0, 0.0, 0.0);
+    lgl->ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     lgl->Clear(GL_COLOR_BUFFER_BIT);
 }
 
@@ -3534,7 +3537,7 @@ static void glplugin_surface_clear(void* _userdata, double r, double g, double b
     const struct PluginSurfaceUserdata* userdata = _userdata;
     const struct GLContext* c = _bolt_context();
     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, userdata->framebuffer);
-    lgl->ClearColor(r, g, b, a);
+    lgl->ClearColor((float)r, (float)g, (float)b, (float)a);
     lgl->Clear(GL_COLOR_BUFFER_BIT);
     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, c->current_draw_framebuffer);
 }
@@ -3549,13 +3552,13 @@ static void glplugin_surface_subimage(void* _userdata, int x, int y, int w, int 
 
 static void glplugin_surface_drawtoscreen(void* userdata, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
     const struct GLContext* c = _bolt_context();
-    surface_draw(c, userdata, &program_direct_screen, 0, gl_width, gl_height, sx, sy, sw, sh, dx, dy, dw, dh);
+    surface_draw(c, userdata, &program_direct_screen, 0, (int)gl_width, (int)gl_height, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 static void glplugin_surface_drawtosurface(void* userdata, void* _target, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
     const struct PluginSurfaceUserdata* target = _target;
     const struct GLContext* c = _bolt_context();
-    surface_draw(c, userdata, &program_direct_surface, target->framebuffer, target->width, target->height, sx, sy, sw, sh, dx, dy, dw, dh);
+    surface_draw(c, userdata, &program_direct_surface, target->framebuffer, (int)target->width, (int)target->height, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 static void glplugin_surface_drawtogameview(void* userdata, void* _gameview, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
@@ -3587,12 +3590,12 @@ static void glplugin_draw_region_outline(void* userdata, int16_t x, int16_t y, u
     gl.UseProgram(program_region);
     gl.BindVertexArray(program_direct_vao);
     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, target->framebuffer);
-    lgl->Viewport(0, 0, gl_width, gl_height);
+    lgl->Viewport(0, 0, (GLsizei)gl_width, (GLsizei)gl_height);
     lgl->Disable(GL_DEPTH_TEST);
     lgl->Disable(GL_SCISSOR_TEST);
     lgl->Disable(GL_CULL_FACE);
     gl.Uniform4i(program_region_xywh, x, y, width, height);
-    gl.Uniform2i(program_region_dest_wh, gl_width, gl_height);
+    gl.Uniform2i(program_region_dest_wh, (GLsizei)gl_width, (GLsizei)gl_height);
     lgl->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
     if (depth_test) lgl->Enable(GL_DEPTH_TEST);
@@ -3607,7 +3610,7 @@ static void glplugin_draw_region_outline(void* userdata, int16_t x, int16_t y, u
 static void glplugin_read_screen_pixels(int16_t x, int16_t y, uint32_t width, uint32_t height, void* data) {
     const struct GLContext* c = _bolt_context();
     gl.BindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-    lgl->ReadPixels(x, gl_height - (y + height), width, height, GL_RGB, GL_UNSIGNED_BYTE, data);
+    lgl->ReadPixels(x, (GLint)gl_height - ((GLint)y + (GLint)height), (GLsizei)width, (GLsizei)height, GL_RGB, GL_UNSIGNED_BYTE, data);
     gl.BindFramebuffer(GL_READ_FRAMEBUFFER, c->current_read_framebuffer);
 }
 
@@ -3616,7 +3619,7 @@ static void glplugin_copy_screen(void* userdata, int sx, int sy, int sw, int sh,
     const struct PluginSurfaceUserdata* surface = userdata;
     gl.BindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, surface->framebuffer);
-    gl.BlitFramebuffer(sx, gl_height - sy, sx + sw, gl_height - (sy + sh), dx, dy, dx + dw, dy + dh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    gl.BlitFramebuffer(sx, (GLint)gl_height - sy, sx + sw, (GLint)gl_height - (sy + sh), dx, dy, dx + dw, dy + dh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     gl.BindFramebuffer(GL_READ_FRAMEBUFFER, c->current_read_framebuffer);
     gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, c->current_draw_framebuffer);
 }
@@ -3761,7 +3764,7 @@ static uint8_t glplugin_shaderprogram_set_attribute(void* userdata, uint8_t attr
     return true;
 }
 
-static void glplugin_shaderprogram_set_uniform_floats(void* userdata, int location, uint8_t count, double* values) {
+static void glplugin_shaderprogram_set_uniform_floats(void* userdata, int location, uint8_t count, const double* values) {
     const struct PluginProgramUserdata* program = (struct PluginProgramUserdata*)userdata;
     struct PluginProgramUniform uniform = {
         .location = location,
@@ -3775,7 +3778,7 @@ static void glplugin_shaderprogram_set_uniform_floats(void* userdata, int locati
     hashmap_set(program->uniforms, &uniform);
 }
 
-static void glplugin_shaderprogram_set_uniform_ints(void* userdata, int location, uint8_t count, int* values) {
+static void glplugin_shaderprogram_set_uniform_ints(void* userdata, int location, uint8_t count, const int* values) {
     const struct PluginProgramUserdata* program = (struct PluginProgramUserdata*)userdata;
     struct PluginProgramUniform uniform = {
         .location = location,
@@ -3789,7 +3792,7 @@ static void glplugin_shaderprogram_set_uniform_ints(void* userdata, int location
     hashmap_set(program->uniforms, &uniform);
 }
 
-static void glplugin_shaderprogram_set_uniform_matrix(void* userdata, int location, uint8_t transpose, uint8_t size, double* values) {
+static void glplugin_shaderprogram_set_uniform_matrix(void* userdata, int location, uint8_t transpose, uint8_t size, const double* values) {
     const struct PluginProgramUserdata* program = (struct PluginProgramUserdata*)userdata;
     struct PluginProgramUniform uniform = {
         .location = location,
@@ -3797,7 +3800,7 @@ static void glplugin_shaderprogram_set_uniform_matrix(void* userdata, int locati
         .type = 1,
         .sub.transpose = transpose,
     };
-    for (size_t i = 0; i < (size * size); i += 1) {
+    for (size_t i = 0; i < ((size_t)size * (size_t)size); i += 1) {
         uniform.values.f[i] = (GLfloat)values[i];
     }
     hashmap_set(program->uniforms, &uniform);
@@ -3831,14 +3834,14 @@ static void glplugin_shaderprogram_drawtosurface(void* userdata, void* surface_,
     const struct PluginProgramUserdata* program = (struct PluginProgramUserdata*)userdata;
     const struct PluginSurfaceUserdata* surface = surface_;
     const struct PluginShaderBufferUserdata* buffer = buffer_;
-    shaderprogram_draw(program, buffer, count, surface->framebuffer, surface->width, surface->height);
+    shaderprogram_draw(program, buffer, (GLsizei)count, surface->framebuffer, (int)surface->width, (int)surface->height);
 }
 
 static void glplugin_shaderprogram_drawtogameview(void* userdata, void* gameview_, void* buffer_, uint32_t count) {
     const struct PluginProgramUserdata* program = (struct PluginProgramUserdata*)userdata;
     const struct GLPluginRenderGameViewUserData* gameview = gameview_;
     const struct PluginShaderBufferUserdata* buffer = buffer_;
-    shaderprogram_draw(program, buffer, count, gameview->target_fb, gameview->width, gameview->height);
+    shaderprogram_draw(program, buffer, (GLsizei)count, gameview->target_fb, gameview->width, gameview->height);
 }
 
 static void glplugin_shaderbuffer_init(struct ShaderBufferFunctions* out, const void* data, uint32_t len) {

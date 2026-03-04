@@ -257,7 +257,7 @@ void _bolt_gl_onMakeCurrent(void*);
 void _bolt_gl_onDestroyContext(void*);
 
 /// Call this in response to glGenTextures, which needs to be hooked from libgl.
-void _bolt_gl_onGenTextures(GLsizei, GLuint*);
+void _bolt_gl_onGenTextures(GLsizei, const GLuint*);
 
 /// Call this in response to glDrawElements, which needs to be hooked from libgl.
 void _bolt_gl_onDrawElements(GLenum, GLsizei, GLenum, const void*);
