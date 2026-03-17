@@ -33,3 +33,63 @@ typedef enum SDL_FlashOperation {
 } SDL_FlashOperation;
 
 typedef uint64_t SDL_WindowFlags;
+
+typedef uint8_t Uint8;
+
+typedef struct SDL_version
+{
+    Uint8 major;        /**< major version */
+    Uint8 minor;        /**< minor version */
+    Uint8 patch;        /**< update version */
+} SDL_version;
+
+typedef enum SDL_SYSWM_TYPE
+{
+    SDL_SYSWM_UNKNOWN,
+    SDL_SYSWM_WINDOWS,
+    SDL_SYSWM_X11,
+    SDL_SYSWM_DIRECTFB,
+    SDL_SYSWM_COCOA,
+    SDL_SYSWM_UIKIT,
+    SDL_SYSWM_WAYLAND,
+    SDL_SYSWM_MIR,  /* no longer available, left for API/ABI compatibility. Remove in 2.1! */
+    SDL_SYSWM_WINRT,
+    SDL_SYSWM_ANDROID,
+    SDL_SYSWM_VIVANTE,
+    SDL_SYSWM_OS2,
+    SDL_SYSWM_HAIKU,
+    SDL_SYSWM_KMSDRM,
+    SDL_SYSWM_RISCOS
+} SDL_SYSWM_TYPE;
+
+struct SDL_SysWMinfo
+{
+    SDL_version version;
+    SDL_SYSWM_TYPE subsystem;
+    union {
+        // normally there are lots of union arms gated behind #ifdef,
+        // but this is the only arm we care about in bolt
+        struct
+        {
+            void* display;           /**< The X11 display */
+            unsigned long window;    /**< The X11 window */
+        } x11;
+
+        /* Make sure this union is always 64 bytes (8 64-bit pointers). */
+        /* Be careful not to overflow this if you add a new target! */
+        Uint8 dummy[64];
+    } info;
+};
+
+#ifdef __CC_ARM
+/* ARM's compiler throws warnings if we use an enum: like "SDL_bool x = a < b;" */
+#define SDL_FALSE 0
+#define SDL_TRUE 1
+typedef int SDL_bool;
+#else
+typedef enum
+{
+    SDL_FALSE = 0,
+    SDL_TRUE = 1
+} SDL_bool;
+#endif

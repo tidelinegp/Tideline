@@ -73,6 +73,7 @@ static unsigned int (*real_eglDestroyContext)(void*, void*) = NULL;
 static unsigned int (*real_eglInitialize)(void*, void*, void*) = NULL;
 static void* (*real_eglCreateContext)(void*, void*, void*, const void*) = NULL;
 static unsigned int (*real_eglTerminate)(void*) = NULL;
+static void* (*real_eglGetDisplay)(void*) = NULL;
 
 static xcb_generic_event_t* (*real_xcb_poll_for_event)(xcb_connection_t*) = NULL;
 static xcb_generic_event_t* (*real_xcb_poll_for_queued_event)(xcb_connection_t*) = NULL;
@@ -83,6 +84,8 @@ static void* (*real_SDL_CreateWindow)(const char*, int, int, int, int, SDL_Windo
 static void* (*real_SDL_CreateSystemCursor)(SDL_SystemCursor) = NULL;
 static unsigned char (*real_SDL_SetCursor)(void*) = NULL;
 static bool (*real_SDL_FlashWindow)(void*, SDL_FlashOperation) = NULL;
+static SDL_bool (*real_SDL_GetWindowWMInfo)(void*, struct SDL_SysWMinfo*) = NULL;
+static void (*real_SDL_GetVersion)(struct SDL_version*) = NULL;
 
 static struct GLLibFunctions libgl = {0};
 
@@ -205,6 +208,8 @@ static void _bolt_init_libegl(unsigned long addr, const Elf32_Word* gnu_hash_tab
     if (sym) real_eglCreateContext = sym->st_value + libegl_addr;
     sym = _bolt_lookup_symbol("eglTerminate", gnu_hash_table, hash_table, string_table, symbol_table);
     if (sym) real_eglTerminate = sym->st_value + libegl_addr;
+    sym = _bolt_lookup_symbol("eglGetDisplay", gnu_hash_table, hash_table, string_table, symbol_table);
+    if (sym) real_eglGetDisplay = sym->st_value + libegl_addr;
 }
 
 static void _bolt_init_libgl(unsigned long addr, const Elf32_Word* gnu_hash_table, const ElfW(Word)* hash_table, const char* string_table, const ElfW(Sym)* symbol_table) {
@@ -269,6 +274,10 @@ static void _bolt_init_libsdl(unsigned long addr, const Elf32_Word* gnu_hash_tab
     if (sym) real_SDL_CreateSystemCursor = sym->st_value + libsdl_addr;
     sym = _bolt_lookup_symbol("SDL_FlashWindow", gnu_hash_table, hash_table, string_table, symbol_table);
     if (sym) real_SDL_FlashWindow = sym->st_value + libsdl_addr;
+    sym = _bolt_lookup_symbol("SDL_GetWindowWMInfo", gnu_hash_table, hash_table, string_table, symbol_table);
+    if (sym) real_SDL_GetWindowWMInfo = sym->st_value + libsdl_addr;
+    sym = _bolt_lookup_symbol("SDL_GetVersion", gnu_hash_table, hash_table, string_table, symbol_table);
+    if (sym) real_SDL_GetVersion = sym->st_value + libsdl_addr;
 }
 
 static int _bolt_dl_iterate_callback(struct dl_phdr_info* info, size_t size, void* args) {
@@ -486,6 +495,22 @@ unsigned int eglTerminate(void* display) {
     // to call it once... bolt defers it to eglDestroyContext so we can do cleanup more easily.
     //return real_eglTerminate(display);
     return 1;
+}
+
+void* eglGetDisplay(void* native_display) {
+    LOGF("eglGetDisplay(%lu)\n", (uintptr_t)native_display);
+    if (!native_display && main_window_sdl) {
+        // fixes a bug in the game client where a null pointer is passed to eglGetDisplay. NULL is
+        // defined as EGL_DEFAULT_DISPLAY, but EGL cannot reasonably be expected to know the x11
+        // display handle at this point, so some drivers reject this, causing the game to crash.
+        struct SDL_SysWMinfo info;
+        real_SDL_GetVersion(&info.version);
+        const SDL_bool success = real_SDL_GetWindowWMInfo(main_window_sdl, &info);
+        if (success && info.subsystem == SDL_SYSWM_X11) {
+            return real_eglGetDisplay(info.info.x11.display);
+        }
+    }
+    return real_eglGetDisplay(native_display);
 }
 
 static void _bolt_mouseevent_from_xcb(int16_t x, int16_t y, uint32_t state, struct MouseEvent* out) {
@@ -833,6 +858,7 @@ static void* _bolt_dl_lookup(void* handle, const char* symbol) {
         if (strcmp(symbol, "eglInitialize") == 0) return eglInitialize;
         if (strcmp(symbol, "eglCreateContext") == 0) return eglCreateContext;
         if (strcmp(symbol, "eglTerminate") == 0) return eglTerminate;
+        if (strcmp(symbol, "eglGetDisplay") == 0) return eglGetDisplay;
     } else if (handle == libgl_addr) {
         if (strcmp(symbol, "glDrawElements") == 0) return glDrawElements;
         if (strcmp(symbol, "glDrawArrays") == 0) return glDrawArrays;
