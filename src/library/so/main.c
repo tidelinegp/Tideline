@@ -803,7 +803,7 @@ int xcb_flush(xcb_connection_t* c) {
 unsigned char SDL_SetCursor(void* cursor) {
     // the documentation claims this returns "true on success, false on failure", but that's wrong.
     // in reality it returns 0 on success.
-    const bool ret = real_SDL_SetCursor(cursor);
+    const unsigned char ret = real_SDL_SetCursor(cursor);
     if (!ret && cursor) {
         sdl_cursor = cursor;
     }
