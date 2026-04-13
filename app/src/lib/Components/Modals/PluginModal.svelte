@@ -10,6 +10,7 @@
 	import type { PluginConfig, PluginMeta, PluginUpdaterConfig } from '$lib/Util/Interfaces';
 	import { clientList } from '$lib/Util/Store';
 	import { GlobalState } from '$lib/State/GlobalState';
+	import { get } from 'svelte/store';
 
 	const { config } = GlobalState;
 
@@ -376,9 +377,6 @@
 		managementPlugin = null;
 	});
 
-	// Track which clients we've already auto-started plugins for
-	let autostartedClients = new Set<number>();
-
 	const startPlugin = async (client: number, id: string, path: string | null) => {
 		const config = await getPluginConfigPromiseByID(id);
 		const main = (config && config.main) ? config.main : defaultMainLuaFilename;
@@ -398,37 +396,25 @@
 
 	// Watch for new clients and autostart their plugins
 	$effect(() => {
-		$clientList.forEach((client) => {
-			if (autostartedClients.has(client.uid)) return;
-			if (!client.identity || !bolt.autostart[client.identity]) return;
-
+		let promises: Promise<void[]>[] = [];
+		$clientList.filter(x => x.is_new).forEach((client) => {
+			if (!client.identity) return;
 			const pluginsToStart = bolt.autostart[client.identity];
-			if (pluginsToStart.length === 0) return;
+			if (!pluginsToStart || pluginsToStart.length === 0) return;
 
-			autostartedClients.add(client.uid);
-
-			// TBD: adding a timeout to wait for client to be read
-			setTimeout(async () => {
-				await Promise.all(
-					pluginsToStart.map(async (pluginId) => {
-						const meta = pluginList[pluginId];
-						if (meta) {
-							await startPlugin(
-								client.uid,
-								pluginId,
-								meta.path || null,
-							);
-						} else {
-							console.warn(`Autostart plugin ${pluginId} not found in plugin list`);
-						}
-					})
-				);
-			}, 2000);
+			promises.push(Promise.all(
+				pluginsToStart.map(async (pluginId) => {
+					const meta = pluginList[pluginId];
+					if (meta) {
+						return startPlugin(client.uid, pluginId, meta.path || null);
+					}
+					console.warn(`Autostart plugin ${pluginId} not found in plugin list`);
+				})
+			));
 		});
-
-		// Clean up Set when clients disconnect
-		const currentClientIds = new Set($clientList.map((c) => c.uid));
-		autostartedClients = new Set([...autostartedClients].filter((id) => currentClientIds.has(id)));
+		if (promises.length > 0 && get(GlobalState.config).close_after_launch) {
+			Promise.all(promises).then(_ => fetch("/close"));
+		}
 	});
 </script>
 

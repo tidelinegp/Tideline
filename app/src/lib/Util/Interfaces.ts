@@ -46,6 +46,7 @@ export interface GameClient {
 	uid: number;
 	identity?: string;
 	plugins: GameClientPlugin[];
+	is_new: boolean;
 }
 
 // rs3 plugin configured in plugins.json
