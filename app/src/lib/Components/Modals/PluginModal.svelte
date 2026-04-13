@@ -274,10 +274,51 @@
 		return true;
 	};
 
-	const removePluginById = (id: string) => {
+	const stopPluginPromise = (client: number, uid: number) => fetch('/stop-plugin?' + new URLSearchParams({client: client.toString(), uid: uid.toString()}).toString());
+
+	const stopPlugin = (client: number, uid: number) => stopPluginPromise(client, uid).then(response => {
+		requestNewClientListPromise();
+		if (!response.ok) {
+			setMessageError(`couldn't stop plugin: ${response.status}: ${response.statusText}`);
+		}
+	});
+
+	const removePluginById = async (id: string) => {
+		const meta = pluginList[id];
+		if (meta === null) return;
+
+		// stop any active instances of this plugin
+		let promises = [];
+		for (const client of $clientList) {
+			for (const plugin of client.plugins) {
+				if (plugin.id === id) {
+					promises.push(stopPluginPromise(client.uid, plugin.uid));
+				}
+			}
+		}
+		await Promise.all(promises).then(() => {
+			requestNewClientListPromise();
+		});
+
+		// remove from autostart
+		let autostart: { [characterID: string]: string[] } = {};
+		for (const [character, list] of Object.entries(bolt.autostart)) {
+			const newList = list.filter(x => x !== id);
+			if (newList.length > 0) autostart[character] = newList;
+		}
+		bolt.autostart = autostart;
+
+		// update plugin config
 		delete pluginList[id];
 		selectedPlugin = null;
 		savePluginConfig(false);
+
+		// request deletion of config and data directories
+		const delete_data = typeof meta.path !== 'string';
+		const params: Record<string, string> = { id, delete_data_dir: delete_data ? '1' : '0' };
+		await fetch('/uninstall-plugin?' + new URLSearchParams(params).toString()).finally(
+			() => setMessageInfo(`plugin '${meta.name}' uninstalled`)
+		);
 	};
 
 	const onManagementPluginUpdate = () => savePluginConfig();
@@ -292,17 +333,10 @@
 		fetch('/open-external-url', { method: 'POST', body: 'https://bolt.adamcake.com/plugins' });
 
 	// connected clients list
-	var isClientSelected: boolean = $state(false);
-	var selectedClientId: number = $state(0);
+	var selectedClientId: number | null = $state(0);
 	$effect(() => {
 		if (!$clientList.some((x) => x.uid === selectedClientId)) {
-			isClientSelected = false;
-		}
-	});
-	$effect(() => {
-		if ($clientList.length > 0 && !selectedClientId) {
-			selectedClientId = $clientList[0].uid;
-			isClientSelected = true;
+			selectedClientId = null;
 		}
 	});
 
@@ -403,10 +437,10 @@
 		class="left-0 float-left h-full w-[min(180px,_50%)] overflow-hidden border-r-2 border-slate-300 pt-2 dark:border-slate-800"
 	>
 		<button
-			class="mx-auto mb-2 w-[95%] select-none rounded-lg border-2 {isClientSelected
+			class="mx-auto mb-2 w-[95%] select-none rounded-lg border-2 {(selectedClientId !== null)
 				? 'border-blue-500 text-black dark:text-white'
 				: 'border-black bg-blue-500 text-black'} p-2 font-bold hover:opacity-75"
-			onclick={() => (isClientSelected = false)}
+			onclick={() => (selectedClientId = null)}
 		>
 			Manage Plugins
 		</button>
@@ -415,11 +449,9 @@
 			<button
 				onclick={() => {
 					selectedClientId = client.uid;
-					isClientSelected = true;
 					messageText = null;
 				}}
-				class="m-1 h-[28px] w-[95%] select-none rounded-lg border-2 {isClientSelected &&
-				selectedClientId === client.uid
+				class="m-1 h-[28px] w-[95%] select-none rounded-lg border-2 {(selectedClientId === client.uid)
 					? 'border-black bg-blue-500 text-black'
 					: 'border-blue-500 text-black dark:text-white'} hover:opacity-75"
 			>
@@ -446,7 +478,7 @@
 				{updatePluginById}
 			/>
 
-			{#if !isClientSelected}
+			{#if selectedClientId === null}
 				<!-- Two-column layout for plugin management -->
 				<div class="flex flex-1 overflow-hidden">
 					<!-- Left: Plugin list -->
@@ -495,9 +527,8 @@
 					accountID={$clientList.find((c) => c.uid === selectedClientId)?.identity}
 					{pluginList}
 					activePlugins={$clientList.find((c) => c.uid === selectedClientId)?.plugins ?? []}
-					onError={setMessageError}
-					onRefresh={() => requestNewClientListPromise()}
 					{startPlugin}
+					{stopPlugin}
 				/>
 			{/if}
 		{/if}

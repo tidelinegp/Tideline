@@ -11,22 +11,16 @@
 		pluginList: { [key: string]: PluginMeta };
 		activePlugins: ClientInfo['plugins'];
 		startPlugin: (clientId: number, pluginId: string, path: string | null) => void;
-		onError: (msg: string) => void;
-		onRefresh: () => void;
+		stopPlugin: (client: number, uid: number) => void;
 	}
 
-	let { clientId, accountID, pluginList, activePlugins, startPlugin, onError, onRefresh }: Props =
-		$props();
+	let { clientId, accountID, pluginList, activePlugins, startPlugin, stopPlugin }: Props = $props();
 
 	let autostart = $state(bolt.autostart ?? {});
 
 	const isPluginAutostart = (pluginId: string): boolean => {
 		if (!accountID || !autostart) return false;
 		return autostart[accountID]?.includes(pluginId) ?? false;
-	};
-
-	const isPluginActive = (pluginId: string): boolean => {
-		return activePlugins.some((p) => p.id === pluginId);
 	};
 
 	const getActivePluginUid = (pluginId: string): number | null => {
@@ -77,12 +71,10 @@
 				pluginMeta={meta}
 				{clientId}
 				clientIdentity={accountID}
-				isActive={isPluginActive(id)}
 				isAutostart={isPluginAutostart(id)}
 				activePluginUid={getActivePluginUid(id)}
 				{startPlugin}
-				{onError}
-				{onRefresh}
+				{stopPlugin}
 				onAutostartChange={handleAutostartChange}
 			/>
 		{/each}

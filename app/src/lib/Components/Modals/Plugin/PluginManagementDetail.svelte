@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PluginMeta, PluginConfig } from '$lib/Util/Interfaces';
-	import { GlobalState } from '$lib/State/GlobalState';
 
 	interface Props {
 		pluginId: string;
@@ -46,18 +45,7 @@
 		}).catch(e => setMessageError(`Error updating: ${e}`)).finally(onUpdate);
 	};
 
-	const removePlugin = async () => {
-		await fetch(
-			'/uninstall-plugin?' +
-				new URLSearchParams({
-					id: pluginId,
-					delete_data_dir: typeof pluginMeta.path === 'string' ? '0' : '1'
-				}).toString()
-		);
-		GlobalState.pluginConfigHasPendingChanges = true;
-		setMessageInfo(`plugin '${pluginMeta.name}' uninstalled`);
-		onRemove(pluginId);
-	};
+	const removePlugin = async () => onRemove(pluginId);
 </script>
 
 {#if pluginConfig}

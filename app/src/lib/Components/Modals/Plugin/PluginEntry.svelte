@@ -6,13 +6,11 @@
 		pluginMeta: PluginMeta;
 		clientId: number;
 		clientIdentity?: string;
-		isActive: boolean;
 		activePluginUid: number | null;
 		isAutostart: boolean;
-		onError: (msg: string) => void;
-		onRefresh: () => void;
-		onAutostartChange: (pluginId: string, enabled: boolean) => void;
 		startPlugin: (clientId: number, pluginId: string, path: string | null) => void;
+		stopPlugin: (client: number, uid: number) => void;
+		onAutostartChange: (pluginId: string, enabled: boolean) => void;
 	}
 
 	let {
@@ -20,34 +18,15 @@
 		pluginMeta,
 		clientId,
 		clientIdentity,
-		isActive,
 		activePluginUid,
 		isAutostart,
 		startPlugin,
-		onError,
-		onRefresh,
+		stopPlugin,
 		onAutostartChange
 	}: Props = $props();
 
-	const stopPlugin = async (client: number, uid: number | null) => {
-		if (uid === null) {
-			return console.error('no plugin uid, cannot stop plugin');
-		}
-		const response = await fetch(
-			'/stop-plugin?' +
-				new URLSearchParams({
-					client: client.toString(),
-					uid: uid.toString()
-				}).toString()
-		);
-		onRefresh();
-		if (!response.ok) {
-			onError(`couldn't stop plugin: ${response.status}: ${response.statusText}`);
-		}
-	};
-
 	const handleToggle = () => {
-		if (isActive) {
+		if (activePluginUid !== null) {
 			stopPlugin(clientId, activePluginUid);
 		} else {
 			startPlugin(clientId, pluginId, pluginMeta.path ?? null);
@@ -79,7 +58,7 @@
 		{/if}
 		<!-- Active toggle -->
 		<label class="relative inline-flex cursor-pointer items-center">
-			<input type="checkbox" checked={isActive} onchange={handleToggle} class="peer sr-only" />
+			<input type="checkbox" checked={activePluginUid !== null} onchange={handleToggle} class="peer sr-only" />
 			<div
 				class="peer h-6 w-11 rounded-full bg-gray-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-500 peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-700"
 			></div>
