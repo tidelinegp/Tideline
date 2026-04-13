@@ -1,15 +1,15 @@
 <script lang="ts">
-	import type { PluginConfig, PluginMeta, PluginUpdaterConfig } from '$lib/Util/Interfaces';
-	import { GlobalState } from '$lib/State/GlobalState';
+	import { type PluginMeta } from '$lib/Util/Interfaces';
 
 	interface Props {
 		hasLibArchive: boolean;
 		pluginList: { [key: string]: PluginMeta };
 		onInstallFromURL: (url: string) => Promise<void>;
 		jsonFilePicker: (cb: () => void) => void;
-		getPluginConfigPromiseFromDataDir: (id: string) => Promise<PluginConfig | null>;
 		setMessageInfo: (msg: string) => void;
 		setMessageError: (msg: string) => void;
+		updatePluginById: (id: string, meta: PluginMeta) => Promise<boolean>;
+		onUpdate: () => void;
 	}
 
 	let {
@@ -17,9 +17,10 @@
 		pluginList,
 		onInstallFromURL,
 		jsonFilePicker,
-		getPluginConfigPromiseFromDataDir,
 		setMessageInfo,
-		setMessageError
+		setMessageError,
+		updatePluginById,
+		onUpdate,
 	}: Props = $props();
 
 	let showURLEntry: boolean = $state(false);
@@ -38,83 +39,20 @@
 		}
 	};
 
-	const updatePluginById = async (id: string, meta: PluginMeta): Promise<boolean> => {
-		if (!meta.updaterURL) return false;
-
-		const url = meta.updaterURL;
-		const x = await fetch(url);
-		if (!x.ok) return false;
-
-		let config: PluginUpdaterConfig = await x.json();
-		if (!config.url) return false;
-
-		let downloadNeeded = false;
-		if (config.sha256) {
-			if (meta.sha256 !== config.sha256) downloadNeeded = true;
-		} else if (config.version) {
-			if (meta.version !== config.version) downloadNeeded = true;
-		}
-
-		if (!downloadNeeded) return false;
-
-		const r = await fetch(config.url);
-		if (!r.ok) return false;
-
-		const data = await r.arrayBuffer();
-		if (config.sha256) {
-			const hash = await crypto.subtle.digest('SHA-256', data);
-			const hashStr = Array.from(new Uint8Array(hash))
-				.map((x) => x.toString(16).padStart(2, '0'))
-				.join('');
-			if (config.sha256 !== hashStr) return false;
-		}
-
-		await fetch('/install-plugin?' + new URLSearchParams({ id }).toString(), {
-			method: 'POST',
-			body: data
-		});
-
-		const plugin = await getPluginConfigPromiseFromDataDir(id);
-		if (!plugin) return false;
-
-		if (config.sha256) meta.sha256 = config.sha256;
-		if (plugin.name) meta.name = plugin.name;
-		if (plugin.version) meta.version = plugin.version;
-
-		GlobalState.pluginConfigHasPendingChanges = true;
-		return true;
-	};
-
-	const updateAllPlugins = async () => {
+	const updateAllPlugins = () => {
 		disableButtons = true;
-		let updatedCount = 0;
-		let skippedCount = 0;
-
-		try {
-			for (const [id, meta] of Object.entries(pluginList)) {
-				if (!meta.updaterURL) {
-					skippedCount++;
-					continue;
-				}
-
-				const result = await updatePluginById(id, meta);
-				if (result) updatedCount++;
-			}
-
+		const promises = Object.entries(pluginList).map(([id, meta]) => updatePluginById(id, meta));
+		Promise.all(promises).then((x) => {
+			const updatedCount = x.filter(b => b).length;
 			if (updatedCount > 0) {
-				setMessageInfo(
-					`Updated ${updatedCount} plugin(s). ${skippedCount} skipped (no updater URL).`
-				);
+				setMessageInfo(`Updated ${updatedCount} plugin(s)`);
 			} else {
-				setMessageInfo(
-					`All plugins are up-to-date. ${skippedCount} plugin(s) have no updater URL.`
-				);
+				setMessageInfo("All plugins are up-to-date");
 			}
-		} catch (e) {
-			setMessageError(`Error updating plugins: ${e}`);
-		} finally {
+		}).catch((e) => setMessageError(`Error updating plugins: ${e}`)).finally(() => {
 			disableButtons = false;
-		}
+			onUpdate();
+		});
 	};
 
 	const onInstallFromFolder = () => {

@@ -102,7 +102,10 @@ export class BoltService {
 
 		const configToSave = { ...bolt.pluginConfig, autostart: bolt.autostart };
 
-		this.postJSON('/save-plugin-config', configToSave, () => (savePluginInProgress = false));
+		this.postJSON('/save-plugin-config', configToSave, () => {
+			savePluginInProgress = false;
+			GlobalState.pluginConfigHasPendingChanges = false;
+		});
 	}
 
 	// sends a request to save all credentials to their config file,

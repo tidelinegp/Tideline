@@ -1,15 +1,16 @@
 <script lang="ts">
-	import type { PluginMeta, PluginConfig, PluginUpdaterConfig } from '$lib/Util/Interfaces';
+	import type { PluginMeta, PluginConfig } from '$lib/Util/Interfaces';
 	import { GlobalState } from '$lib/State/GlobalState';
 
 	interface Props {
 		pluginId: string;
 		pluginMeta: PluginMeta;
 		pluginConfig: PluginConfig | null;
-		onRemove: () => void;
+		onRemove: (id: string) => void;
 		onUpdate: () => void;
 		setMessageInfo: (msg: string) => void;
 		setMessageError: (msg: string) => void;
+		updatePluginById: (id: string, meta: PluginMeta) => Promise<boolean>;
 	}
 
 	let {
@@ -19,7 +20,8 @@
 		onRemove,
 		onUpdate,
 		setMessageInfo,
-		setMessageError
+		setMessageError,
+		updatePluginById,
 	}: Props = $props();
 
 	const browseData = () => {
@@ -34,66 +36,14 @@
 		fetch('/browse-plugin-config?' + new URLSearchParams({ id: pluginId }).toString());
 	};
 
-	const updatePlugin = async () => {
-		if (!pluginMeta.updaterURL) return;
-
-		const url = pluginMeta.updaterURL;
-		const x = await fetch(url);
-		if (!x.ok) {
-			setMessageError(`can't update plugin: updater URL returned ${x.status}: ${x.statusText}`);
-			return;
-		}
-
-		let config: PluginUpdaterConfig = await x.json();
-		if (!config.url) {
-			setMessageInfo(
-				`can't update plugin '${pluginMeta.name}': no remote download URL is configured`
-			);
-			return;
-		}
-
-		let downloadNeeded = false;
-		if (config.sha256) {
-			if (pluginMeta.sha256 !== config.sha256) {
-				downloadNeeded = true;
+	const updatePlugin = () => {
+		updatePluginById(pluginId, pluginMeta).then(didUpdate => {
+			if (didUpdate) {
+				setMessageInfo(`Plugin "${pluginMeta.name}" updated`);
+			} else {
+				setMessageInfo("Plugin already up-to-date");
 			}
-		} else if (config.version) {
-			if (pluginMeta.version !== config.version) {
-				downloadNeeded = true;
-			}
-		}
-
-		if (!downloadNeeded) {
-			setMessageInfo(`plugin '${pluginMeta.name}' is already up-to-date`);
-			return;
-		}
-
-		const r = await fetch(config.url);
-		if (!r.ok) {
-			setMessageError(
-				`can't update plugin: remote download URL returned ${r.status}: ${r.statusText}`
-			);
-			return;
-		}
-		const data = await r.arrayBuffer();
-		if (config.sha256) {
-			const hash = await crypto.subtle.digest('SHA-256', data);
-			const hashStr = Array.from(new Uint8Array(hash))
-				.map((x) => x.toString(16).padStart(2, '0'))
-				.join('');
-			if (config.sha256 !== hashStr) {
-				setMessageError(`can't update plugin '${pluginMeta.name}': incorrect file hash`);
-				return;
-			}
-		}
-		await fetch('/install-plugin?' + new URLSearchParams({ id: pluginId }).toString(), {
-			method: 'POST',
-			body: data
-		});
-
-		GlobalState.pluginConfigHasPendingChanges = true;
-		setMessageInfo(`plugin '${pluginMeta.name}' updated`);
-		onUpdate();
+		}).catch(e => setMessageError(`Error updating: ${e}`)).finally(onUpdate);
 	};
 
 	const removePlugin = async () => {
@@ -106,12 +56,12 @@
 		);
 		GlobalState.pluginConfigHasPendingChanges = true;
 		setMessageInfo(`plugin '${pluginMeta.name}' uninstalled`);
-		onRemove();
+		onRemove(pluginId);
 	};
 </script>
 
 {#if pluginConfig}
-	<div class="flex h-full flex-col items-center justify-center p-6 text-center">
+	<div class="flex h-full flex-col items-center justify-center px-2 py-5 text-center">
 		<h2 class="pb-2 text-2xl font-bold">
 			{pluginConfig.name ?? '(unnamed)'}
 		</h2>
@@ -124,42 +74,50 @@
 			{pluginConfig.description ?? 'no description'}
 		</p>
 
-		<div class="flex flex-col items-center justify-center gap-2">
-			<div class="flex flex-wrap justify-center gap-2">
+		<div class="w-full max-w-96 flex flex-col items-center justify-center gap-2">
+			<div class="w-full flex justify-around">
 				<button
-					class="rounded-lg bg-blue-500 px-4 py-2 font-bold text-black duration-200 hover:opacity-75"
+					class="w-full rounded-lg bg-blue-500 px-4 py-1 mx-1 font-bold text-black duration-200 hover:opacity-75"
 					onclick={browseData}
 				>
-					Browse data
+					Data
 				</button>
 
 				<button
-					class="rounded-lg bg-blue-500 px-4 py-2 font-bold text-black duration-200 hover:opacity-75"
+					class="w-full rounded-lg bg-blue-500 px-4 py-1 mx-1 font-bold text-black duration-200 hover:opacity-75"
 					onclick={browseConfig}
 				>
-					Browse config
+					Config
 				</button>
-
+			</div>
+			<div class="w-full flex justify-around">
 				{#if pluginMeta.updaterURL}
 					<button
-						class="rounded-lg bg-blue-500 px-4 py-2 font-bold text-black duration-200 hover:opacity-75"
+						class="w-full rounded-lg bg-blue-500 px-4 py-1 mx-1 font-bold text-black duration-200 hover:opacity-75"
 						onclick={updatePlugin}
 					>
-						Check updates
+						Update
 					</button>
 				{/if}
+				<button
+					class="w-full rounded-lg bg-rose-500 px-4 py-1 mx-1 font-bold text-black duration-200 hover:opacity-75"
+					onclick={removePlugin}
+				>
+					Remove
+				</button>
 			</div>
-
+		</div>
+	</div>
+{:else}
+	<div class="flex h-full items-center justify-center p-6">
+		<div>
+			<p class="text-slate-600 dark:text-slate-400">Loading plugin details...</p>
 			<button
-				class="rounded-lg bg-rose-500 px-4 py-2 font-bold text-black duration-200 hover:opacity-75"
+				class="w-full rounded-lg bg-rose-500 px-4 py-1 font-bold text-black duration-200 hover:opacity-75"
 				onclick={removePlugin}
 			>
 				Remove
 			</button>
 		</div>
-	</div>
-{:else}
-	<div class="flex h-full items-center justify-center p-6">
-		<p class="text-slate-600 dark:text-slate-400">Loading plugin details...</p>
 	</div>
 {/if}

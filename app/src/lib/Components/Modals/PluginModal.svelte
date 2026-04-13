@@ -7,7 +7,7 @@
 	import { bolt } from '$lib/State/Bolt';
 	import { BoltService } from '$lib/Services/BoltService';
 	import { requestNewClientListPromise } from '$lib/Util/Functions';
-	import { type PluginConfig, type PluginMeta } from '$lib/Util/Interfaces';
+	import type { PluginConfig, PluginMeta, PluginUpdaterConfig } from '$lib/Util/Interfaces';
 	import { clientList } from '$lib/Util/Store';
 	import { GlobalState } from '$lib/State/GlobalState';
 
@@ -38,10 +38,13 @@
 		modal.open();
 	}
 
-	const close = () => {
+	const savePluginConfig = (check: boolean = true) => {
+		pluginList = pluginList;
 		bolt.pluginConfig = pluginList;
-		BoltService.savePluginConfig();
+		BoltService.savePluginConfig(check);
 	};
+
+	const close = () => savePluginConfig();
 
 	// sets the info message to some white text
 	const setMessageInfo = (msg: string) => {
@@ -86,7 +89,10 @@
 	};
 
 	// creates a PluginConfig from the ID of an installed plugin
-	const getPluginConfigPromiseByID = async (id: string): Promise<PluginConfig | null> => {
+	const getPluginConfigPromiseByID = async (id: string | null): Promise<PluginConfig | null> => {
+		if (id === null) {
+			return null;
+		}
 		const meta = pluginList[id];
 		if (!meta) return null;
 		const path = meta.path;
@@ -189,10 +195,7 @@
 		}
 	};
 
-	const handlePluginMetaChange = () => {
-		bolt.pluginConfig = pluginList;
-		GlobalState.pluginConfigHasPendingChanges = true;
-	};
+	const handlePluginMetaChange = () => savePluginConfig(false);
 
 	// shows the user a file picker for .json files which will attempt to add
 	// a plugin using the manifest that the user selects, if any.
@@ -223,11 +226,66 @@
 			.finally(cb);
 	};
 
+	const updatePluginById = async (id: string, meta: PluginMeta): Promise<boolean> => {
+		if (!meta.updaterURL) return false;
+
+		const url = meta.updaterURL;
+		const x = await fetch(url);
+		if (!x.ok) return false;
+
+		let config: PluginUpdaterConfig = await x.json();
+		if (!config.url) return false;
+
+		let downloadNeeded = false;
+		if (config.sha256) {
+			if (meta.sha256 !== config.sha256) downloadNeeded = true;
+		} else if (config.version) {
+			if (meta.version !== config.version) downloadNeeded = true;
+		}
+
+		if (!downloadNeeded) return false;
+
+		const r = await fetch(config.url);
+		if (!r.ok) return false;
+
+		const data = await r.arrayBuffer();
+		if (config.sha256) {
+			const hash = await crypto.subtle.digest('SHA-256', data);
+			const hashStr = Array.from(new Uint8Array(hash))
+				.map((x) => x.toString(16).padStart(2, '0'))
+				.join('');
+			if (config.sha256 !== hashStr) return false;
+		}
+
+		await fetch('/install-plugin?' + new URLSearchParams({ id }).toString(), {
+			method: 'POST',
+			body: data,
+		});
+
+		const plugin = await getPluginConfigPromiseFromDataDir(id);
+		if (!plugin) return false;
+
+		if (config.sha256) meta.sha256 = config.sha256;
+		if (plugin.name) meta.name = plugin.name;
+		if (plugin.version) meta.version = plugin.version;
+
+		GlobalState.pluginConfigHasPendingChanges = true;
+		return true;
+	};
+
+	const removePluginById = (id: string) => {
+		delete pluginList[id];
+		selectedPlugin = null;
+		savePluginConfig(false);
+	};
+
+	const onManagementPluginUpdate = () => savePluginConfig();
+
 	// get connected client list - the UI can be re-opened while clients are already running
 	requestNewClientListPromise();
 
 	// plugin management interface - currently-selected plugin
-	var selectedPlugin: string = $state('');
+	var selectedPlugin: string | null = $state(null);
 
 	const openAboutPlugins = () =>
 		fetch('/open-external-url', { method: 'POST', body: 'https://bolt.adamcake.com/plugins' });
@@ -247,40 +305,40 @@
 		}
 	});
 
-	let selectedPluginMeta = $derived(pluginList[selectedPlugin]);
+	let selectedPluginMeta = $derived(selectedPlugin ? pluginList[selectedPlugin] : null);
 
 	// the PluginConfig of the plugin currently selected
-	let managementPluginPromise: Promise<PluginConfig | null> | null = $derived(
+	let managementPluginPromise: Promise<PluginConfig | null> = $derived(
 		getPluginConfigPromiseByID(selectedPlugin)
 	);
 	let managementPlugin: PluginConfig | null = $state(null);
 	$effect(() => {
-		if (!managementPluginPromise) {
-			managementPlugin = null;
-			return;
-		}
 		managementPluginPromise.then((x) => {
-			if (!x) return;
 			managementPlugin = x;
+			if (!x) return;
+
+			if (selectedPlugin === null) return;
+			let meta = pluginList[selectedPlugin];
+			if (!meta) return;
 
 			// if bolt.json has been changed, update the PluginMeta and our plugin config file accordingly
 			let dirty = false;
-			if (x.name !== selectedPluginMeta.originalName) {
-				if (selectedPluginMeta.name === selectedPluginMeta.originalName) {
-					selectedPluginMeta.name = x.name;
+			if (x.name !== meta.originalName) {
+				if (meta.name === meta.originalName) {
+					meta.name = x.name;
 				}
-				selectedPluginMeta.originalName = x.name;
+				meta.originalName = x.name;
 				dirty = true;
 			}
-			if (x.version !== selectedPluginMeta.version) {
-				selectedPluginMeta.version = x.version;
+			if (x.version !== meta.version) {
+				meta.version = x.version;
 				dirty = true;
 			}
 			if (dirty) {
-				selectedPluginMeta = selectedPluginMeta;
-				GlobalState.pluginConfigHasPendingChanges = true;
+				savePluginConfig(false);
 			}
 		});
+		managementPlugin = null;
 	});
 
 	// Track which clients we've already auto-started plugins for
@@ -380,10 +438,11 @@
 				hasLibArchive={bolt.hasLibArchive}
 				{pluginList}
 				onInstallFromURL={addPluginFromUpdaterURL}
+				onUpdate={onManagementPluginUpdate}
 				{jsonFilePicker}
-				{getPluginConfigPromiseFromDataDir}
 				{setMessageInfo}
 				{setMessageError}
+				{updatePluginById}
 			/>
 
 			{#if !isClientSelected}
@@ -404,22 +463,16 @@
 
 					<!-- Right: Plugin details -->
 					<div class="flex-1 overflow-y-auto">
-						{#if selectedPlugin}
+						{#if selectedPlugin !== null && selectedPluginMeta !== null}
 							<PluginManagementDetail
 								pluginId={selectedPlugin}
 								pluginMeta={selectedPluginMeta}
 								pluginConfig={managementPlugin}
-								onRemove={() => {
-									delete pluginList[selectedPlugin];
-									pluginList = pluginList;
-									selectedPlugin = '';
-									managementPluginPromise = null;
-								}}
-								onUpdate={async () => {
-									managementPluginPromise = getPluginConfigPromiseByID(selectedPlugin);
-								}}
+								onRemove={removePluginById}
+								onUpdate={onManagementPluginUpdate}
 								{setMessageInfo}
 								{setMessageError}
+								{updatePluginById}
 							/>
 						{:else if Object.keys(pluginList).length === 0}
 							<div class="flex h-full items-center justify-center p-6">
