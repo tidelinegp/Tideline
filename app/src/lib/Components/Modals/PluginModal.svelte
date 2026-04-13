@@ -23,6 +23,7 @@
 	const platformFileSep: string = bolt.platform === 'windows' ? '\\' : '/';
 	const configFileName: string = 'bolt.json';
 	const sepConfigFileName: string = platformFileSep.concat(configFileName);
+	const defaultMainLuaFilename = 'main.lua';
 
 	function getAccountNameById(id?: string): string {
 		if (!id) return unnamedClientName;
@@ -344,7 +345,9 @@
 	// Track which clients we've already auto-started plugins for
 	let autostartedClients = new Set<number>();
 
-	const startPlugin = async (client: number, id: string, path: string | null, main: string) => {
+	const startPlugin = async (client: number, id: string, path: string | null) => {
+		const config = await getPluginConfigPromiseByID(id);
+		const main = (config && config.main) ? config.main : defaultMainLuaFilename;
 		const params: Record<string, string> = { client: client.toString(), id, main };
 		if (path) {
 			const pathWithCorrectSeps = path.replaceAll('\\', '/');
@@ -376,12 +379,10 @@
 					pluginsToStart.map(async (pluginId) => {
 						const meta = pluginList[pluginId];
 						if (meta) {
-							const config = await getPluginConfigPromiseByID(pluginId);
 							await startPlugin(
 								client.uid,
 								pluginId,
 								meta.path || null,
-								config?.main ?? 'main.lua'
 							);
 						} else {
 							console.warn(`Autostart plugin ${pluginId} not found in plugin list`);

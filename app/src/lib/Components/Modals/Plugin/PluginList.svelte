@@ -1,8 +1,7 @@
 <script lang="ts">
 	import PluginEntry from './PluginEntry.svelte';
-	import type { PluginMeta, PluginConfig } from '$lib/Util/Interfaces';
+	import { type PluginMeta } from '$lib/Util/Interfaces';
 	import type { ClientInfo } from '$lib/Util/Store';
-	import { GlobalState } from '$lib/State/GlobalState';
 	import { bolt } from '$lib/State/Bolt';
 	import { BoltService } from '$lib/Services/BoltService';
 
@@ -11,7 +10,7 @@
 		accountID?: string;
 		pluginList: { [key: string]: PluginMeta };
 		activePlugins: ClientInfo['plugins'];
-		startPlugin: (clientId: number, pluginId: string, path: string | null, main: string) => void;
+		startPlugin: (clientId: number, pluginId: string, path: string | null) => void;
 		onError: (msg: string) => void;
 		onRefresh: () => void;
 	}
@@ -25,35 +24,6 @@
 		if (!accountID || !autostart) return false;
 		return autostart[accountID]?.includes(pluginId) ?? false;
 	};
-
-	// Map to store plugin configs
-	let pluginConfigs: Map<string, PluginConfig | null> = $state(new Map());
-
-	const getPluginConfigPromise = async (
-		id: string,
-		meta: PluginMeta
-	): Promise<PluginConfig | null> => {
-		if (meta.path) {
-			const path =
-				meta.path + (meta.path.endsWith('/') || meta.path.endsWith('\\') ? '' : '/') + 'bolt.json';
-			const response = await fetch('/read-json-file?' + new URLSearchParams({ path }).toString());
-			if (!response.ok) return null;
-			return response.json();
-		} else {
-			const response = await fetch('/get-plugindir-json?' + new URLSearchParams({ id }).toString());
-			if (!response.ok) return null;
-			return response.json();
-		}
-	};
-
-	// Load all plugin configs
-	$effect(() => {
-		Object.entries(pluginList).forEach(async ([id, meta]) => {
-			const config = await getPluginConfigPromise(id, meta);
-			pluginConfigs.set(id, config);
-			pluginConfigs = pluginConfigs; // trigger reactivity
-		});
-	});
 
 	const isPluginActive = (pluginId: string): boolean => {
 		return activePlugins.some((p) => p.id === pluginId);
@@ -89,8 +59,7 @@
 		// Sync back and save
 		bolt.autostart = autostart;
 		autostart = autostart; // trigger Svelte reactivity
-		BoltService.savePluginConfig();
-		GlobalState.pluginConfigHasPendingChanges = true;
+		BoltService.savePluginConfig(false);
 	};
 </script>
 
@@ -112,7 +81,6 @@
 				isAutostart={isPluginAutostart(id)}
 				activePluginUid={getActivePluginUid(id)}
 				{startPlugin}
-				mainFile={pluginConfigs.get(id)?.main ?? null}
 				{onError}
 				{onRefresh}
 				onAutostartChange={handleAutostartChange}

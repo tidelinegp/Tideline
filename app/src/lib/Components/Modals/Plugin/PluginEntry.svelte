@@ -9,11 +9,10 @@
 		isActive: boolean;
 		activePluginUid: number | null;
 		isAutostart: boolean;
-		mainFile: string | null;
 		onError: (msg: string) => void;
 		onRefresh: () => void;
 		onAutostartChange: (pluginId: string, enabled: boolean) => void;
-		startPlugin: (clientId: number, pluginId: string, path: string | null, main: string) => void;
+		startPlugin: (clientId: number, pluginId: string, path: string | null) => void;
 	}
 
 	let {
@@ -24,14 +23,11 @@
 		isActive,
 		activePluginUid,
 		isAutostart,
-		mainFile,
 		startPlugin,
 		onError,
 		onRefresh,
 		onAutostartChange
 	}: Props = $props();
-
-	const defaultMainLuaFilename = 'main.lua';
 
 	const stopPlugin = async (client: number, uid: number | null) => {
 		if (uid === null) {
@@ -54,7 +50,7 @@
 		if (isActive) {
 			stopPlugin(clientId, activePluginUid);
 		} else {
-			startPlugin(clientId, pluginId, pluginMeta.path ?? null, mainFile ?? defaultMainLuaFilename);
+			startPlugin(clientId, pluginId, pluginMeta.path ?? null);
 		}
 	};
 
