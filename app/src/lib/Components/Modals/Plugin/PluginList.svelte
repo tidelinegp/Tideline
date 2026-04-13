@@ -57,7 +57,7 @@
 	};
 </script>
 
-<div class="mx-auto w-full max-w-2xl">
+<div class="flex-1 mx-auto w-full max-w-2xl overflow-y-auto">
 	{#if Object.keys(pluginList).length === 0}
 		<p class="p-4 text-center text-slate-600 dark:text-slate-400">No plugins installed</p>
 	{:else}

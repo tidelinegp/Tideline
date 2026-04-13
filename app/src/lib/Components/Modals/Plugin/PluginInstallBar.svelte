@@ -65,7 +65,7 @@
 	<h3 class="mb-3 text-lg font-semibold">Install Plugin</h3>
 	<div class="flex justify-center gap-4">
 		<button
-			class="flex flex-col items-center gap-2 rounded-lg bg-blue-500 px-6 py-3 duration-200 enabled:hover:opacity-75 disabled:bg-gray-500"
+			class="flex flex-col items-center gap-2 rounded-lg bg-blue-500 px-6 py-2 duration-200 enabled:hover:opacity-75 disabled:bg-gray-500"
 			onclick={() => {
 				showURLEntry = !showURLEntry;
 				textURLEntry = '';
@@ -77,7 +77,7 @@
 			<span class="text-sm font-medium text-black">From URL</span>
 		</button>
 		<button
-			class="flex flex-col items-center gap-2 rounded-lg bg-blue-500 px-6 py-3 duration-200 enabled:hover:opacity-75 disabled:bg-gray-500"
+			class="flex flex-col items-center gap-2 rounded-lg bg-blue-500 px-6 py-2 duration-200 enabled:hover:opacity-75 disabled:bg-gray-500"
 			onclick={onInstallFromFolder}
 			disabled={disableButtons}
 			title="Install plugin from local directory"
@@ -86,7 +86,7 @@
 			<span class="text-sm font-medium text-black">From Folder</span>
 		</button>
 		<button
-			class="flex flex-col items-center gap-2 rounded-lg bg-emerald-500 px-6 py-3 duration-200 enabled:hover:opacity-75 disabled:bg-gray-500"
+			class="flex flex-col items-center gap-2 rounded-lg bg-emerald-500 px-6 py-2 duration-200 enabled:hover:opacity-75 disabled:bg-gray-500"
 			onclick={updateAllPlugins}
 			disabled={disableButtons}
 			title="Update all plugins with updater URLs"

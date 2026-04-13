@@ -434,7 +434,7 @@
 
 <Modal bind:this={modal} class="h-[90%] w-[90%] text-center" onClose={close}>
 	<div
-		class="left-0 float-left h-full w-[min(180px,_50%)] overflow-hidden border-r-2 border-slate-300 pt-2 dark:border-slate-800"
+		class="left-0 float-left h-full w-[min(180px,_50%)] overflow-x-hidden overflow-y-auto border-r-2 border-slate-300 pt-2 dark:border-slate-800"
 	>
 		<button
 			class="mx-auto mb-2 w-[95%] select-none rounded-lg border-2 {(selectedClientId !== null)
@@ -532,20 +532,22 @@
 				/>
 			{/if}
 		{/if}
-		{#if messageText}
-			<div class="mt-4">
-				{#if messageIsError}
-					<p class="text-red-500">[error] {messageText}</p>
-				{:else}
-					<p>[info] {messageText}</p>
+		<div class="m-0 p-0 h-8 border-t border-slate-300 dark:border-slate-800 overflow-hidden">
+			<div class="m-1 overflow-hidden">
+				{#if messageText}
+					{#if messageIsError}
+						<p class="text-red-500">[error] {messageText}</p>
+					{:else}
+						<p>[info] {messageText}</p>
+					{/if}
 				{/if}
 			</div>
-		{/if}
+		</div>
 	</div>
-	<div class="absolute bottom-2 right-4">
+	<div class="absolute bottom-2 left-2">
 		<button
 			class="m-0 cursor-pointer select-none border-none bg-transparent p-0 text-sm text-gray-500 underline"
-			onclick={openAboutPlugins}>about plugins</button
+			onclick={openAboutPlugins}>about plugins...</button
 		>
 	</div>
 </Modal>

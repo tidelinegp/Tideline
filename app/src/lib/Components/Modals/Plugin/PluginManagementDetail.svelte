@@ -49,7 +49,7 @@
 </script>
 
 {#if pluginConfig}
-	<div class="flex h-full flex-col items-center justify-center px-2 py-5 text-center">
+	<div class="flex h-full flex-col items-center justify-center px-2 py-5 text-center overflow-y-auto">
 		<h2 class="pb-2 text-2xl font-bold">
 			{pluginConfig.name ?? '(unnamed)'}
 		</h2>
