@@ -139,6 +139,7 @@ namespace Browser {
 			struct GameClient {
 				uint64_t uid;
 				int fd;
+				bool is_new;
 				bool deleted;
 				// identity may be null if game hasn't reported its identity yet or display name is unset
 				char* identity;

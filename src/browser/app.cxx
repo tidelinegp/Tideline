@@ -167,6 +167,7 @@ bool Browser::App::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRe
 				}
 				client->SetValue("uid", CefV8Value::CreateUInt(dict->GetInt("uid")), V8_PROPERTY_ATTRIBUTE_READONLY);
 				client->SetValue("plugins", plugins, V8_PROPERTY_ATTRIBUTE_READONLY);
+				client->SetValue("is_new", CefV8Value::CreateBool(dict->GetBool("is_new")), V8_PROPERTY_ATTRIBUTE_READONLY);
 
 				clients->SetValue(i, client);
 			}

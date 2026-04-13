@@ -180,7 +180,7 @@ Browser::Details Browser::Client::LauncherDetails() {
 void Browser::Client::IPCHandleNewClient(int fd) {
 	fmt::print("[I] new client fd {}\n", fd);
 	this->game_clients_lock.lock();
-	this->game_clients.push_back(GameClient {.uid = this->next_client_uid, .fd = fd, .deleted = false, .identity = nullptr});
+	this->game_clients.push_back(GameClient {.uid = this->next_client_uid, .fd = fd, .is_new = false, .deleted = false, .identity = nullptr});
 	this->next_client_uid += 1;
 	this->game_clients_lock.unlock();
 }
@@ -279,6 +279,7 @@ bool Browser::Client::IPCHandleMessage(int fd) {
 			client->identity = new char[header.id_length + 1];
 			_bolt_ipc_receive(fd, client->identity, header.id_length);
 			client->identity[header.id_length] = '\0';
+			client->is_new = true;
 			this->IPCHandleClientListUpdate(false);
 			break;
 		}
@@ -456,9 +457,10 @@ void Browser::Client::ListGameClients(CefRefPtr<CefListValue> list, bool need_lo
 	if (need_lock_mutex) this->game_clients_lock.lock();
 	list->SetSize(std::count_if(this->game_clients.begin(), this->game_clients.end(), [](const GameClient& c){ return !c.deleted; }));
 	size_t list_index = 0;
-	for (const GameClient& g: this->game_clients) {
+	for (GameClient& g: this->game_clients) {
 		if (g.deleted) continue;
 		CefRefPtr<CefDictionaryValue> inner_dict = CefDictionaryValue::Create();
+		inner_dict->SetBool("is_new", g.is_new);
 		if (g.identity) inner_dict->SetString("identity", g.identity);
 		inner_dict->SetInt("uid", g.uid);
 		CefRefPtr<CefListValue> plugin_list = CefListValue::Create();
@@ -474,6 +476,7 @@ void Browser::Client::ListGameClients(CefRefPtr<CefListValue> list, bool need_lo
 		}
 		inner_dict->SetList("plugins", plugin_list);
 		list->SetDictionary(list_index, inner_dict);
+		g.is_new = false;
 		list_index += 1;
 	}
 	if (need_lock_mutex) this->game_clients_lock.unlock();
