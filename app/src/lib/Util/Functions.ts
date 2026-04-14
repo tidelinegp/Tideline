@@ -236,7 +236,7 @@ export function launchRuneLite(
 				const runelite = response
 					.map((x: Record<string, string>) => x.assets)
 					.flat()
-					.find((x: Record<string, string>) => x.name.toLowerCase() == 'runelite.jar');
+					.find((x: Record<string, string>) => x.name.localeCompare('runelite.jar', 'en', { sensitivity: 'base' }) === 0);
 				if (!runelite) {
 					logger.info(`note: no runelite releases found, so skipping update check`);
 					tryLaunchExisting();
