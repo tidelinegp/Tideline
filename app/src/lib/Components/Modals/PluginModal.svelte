@@ -134,13 +134,22 @@
 		}
 	};
 
+	// returns true if the hash is correct, false if not
+	const checkSHA256 = async (data: ArrayBuffer, hash: string): Promise<boolean> => {
+		const dataHash = await crypto.subtle.digest('SHA-256', data);
+		const dataHashStr = Array.from(new Uint8Array(dataHash))
+			.map((x) => x.toString(16).padStart(2, '0'))
+			.join('');
+		return dataHashStr.localeCompare(hash, 'en', { sensitivity: 'base' }) === 0;
+	};
+
 	// tries to configure a new plugin from an updater URL
 	const addPluginFromUpdaterURL = async (url: string) => {
 		try {
 			setMessageInfo('downloading...');
 			const metaUrlResponse = await fetch(url);
 			if (!metaUrlResponse) return;
-			const config = await metaUrlResponse.json();
+			const config: PluginUpdaterConfig = await metaUrlResponse.json();
 
 			if (!config.url) {
 				setMessageError("can't install plugin: no download URL");
@@ -155,15 +164,9 @@
 				return;
 			}
 			const data = await configUrlResponse.arrayBuffer();
-			if (config.sha256) {
-				const hash = await crypto.subtle.digest('SHA-256', data);
-				const hashStr = Array.from(new Uint8Array(hash))
-					.map((x) => x.toString(16).padStart(2, '0'))
-					.join('');
-				if (config.sha256 !== hashStr) {
-					setMessageError("can't install plugin: incorrect file hash");
-					return;
-				}
+			if (config.sha256 && !checkSHA256(data, config.sha256)) {
+				setMessageError("can't install plugin: incorrect file hash");
+				return;
 			}
 
 			const id = getNewPluginID();
@@ -240,7 +243,7 @@
 
 		let downloadNeeded = false;
 		if (config.sha256) {
-			if (meta.sha256 !== config.sha256) downloadNeeded = true;
+			if (!meta.sha256 || meta.sha256.localeCompare(config.sha256, 'en', { sensitivity: 'base' })) downloadNeeded = true;
 		} else if (config.version) {
 			if (meta.version !== config.version) downloadNeeded = true;
 		}
@@ -251,12 +254,8 @@
 		if (!r.ok) return false;
 
 		const data = await r.arrayBuffer();
-		if (config.sha256) {
-			const hash = await crypto.subtle.digest('SHA-256', data);
-			const hashStr = Array.from(new Uint8Array(hash))
-				.map((x) => x.toString(16).padStart(2, '0'))
-				.join('');
-			if (config.sha256 !== hashStr) return false;
+		if (config.sha256 && !checkSHA256(data, config.sha256)) {
+			return false;
 		}
 
 		await fetch('/install-plugin?' + new URLSearchParams({ id }).toString(), {
