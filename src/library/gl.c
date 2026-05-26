@@ -1306,16 +1306,19 @@ static void glLinkProgram(GLuint program) {
     const GLchar* ViewTransforms_var_names[] = {"uCameraPosition", "uViewMatrix", "uProjectionMatrix", "uViewProjMatrix", "uInvViewMatrix"};
     const GLchar* BatchConsts_var_names[] = {"uAtlasMeta", "uVertexScale"};
     const GLchar* VertexTransformData_var_names[] = {"uBoneTransforms", "uSmoothSkinning"};
-    const GLchar* ModelConsts_DynamicBufferRegion_var_names[] = {"uModelMatrix"};
+    const GLchar* ModelConsts_var_names[] = {"uModelMatrix"};
     const GLchar* ParticleConsts_var_names[] = {"uParticleEmitterTransforms", "uParticleEmitterTransformRanges", "uAtlasMeta"};
     const GLchar* TerrainConsts_var_names[] = {"uGridSize", "uModelMatrix"};
     const GLchar* GUIConsts_var_names[] = {"uProjectionMatrix"};
     const GLchar* BilloardConsts_var_names[] = {"uModelMatrix", "uAtlasMeta"};
 
 #define DEFINEUBO(NAME) \
-    const GLuint block_index_##NAME = gl.GetUniformBlockIndex(program, #NAME); \
+    GLuint block_index_##NAME = gl.GetUniformBlockIndex(program, #NAME); \
     GLuint ubo_indices_##NAME[sizeof(NAME##_var_names) / sizeof(*NAME##_var_names)]; \
     GLint NAME##_offsets[sizeof(NAME##_var_names) / sizeof(*NAME##_var_names)]; \
+    if ((GLint)block_index_##NAME == -1) { \
+        block_index_##NAME = gl.GetUniformBlockIndex(program, #NAME "_DynamicBufferRegion"); \
+    } \
     if ((GLint)block_index_##NAME != -1) { \
         gl.GetUniformIndices(program, sizeof(NAME##_var_names) / sizeof(*NAME##_var_names), NAME##_var_names, ubo_indices_##NAME); \
         gl.GetActiveUniformsiv(program, sizeof(NAME##_var_names) / sizeof(*NAME##_var_names), ubo_indices_##NAME, GL_UNIFORM_OFFSET, NAME##_offsets); \
@@ -1323,7 +1326,7 @@ static void glLinkProgram(GLuint program) {
     DEFINEUBO(ViewTransforms)
     DEFINEUBO(BatchConsts)
     DEFINEUBO(VertexTransformData)
-    DEFINEUBO(ModelConsts_DynamicBufferRegion)
+    DEFINEUBO(ModelConsts)
     DEFINEUBO(ParticleConsts)
     DEFINEUBO(TerrainConsts)
     DEFINEUBO(GUIConsts)
@@ -1357,7 +1360,7 @@ static void glLinkProgram(GLuint program) {
             p->offset_uProjectionMatrix = GUIConsts_offsets[0];
             p->is_2d = 1;
         }
-        if (p->loc_aTextureUV != -1 && p->loc_aVertexColour != -1 && p->loc_aVertexPosition_BoneLabel != -1 && p->loc_aMaterialSettingsSlotXY_TilePositionXZ != -1 && p->loc_uTextureAtlas != -1 && p->loc_uTextureAtlasSettings != -1 && block_index_ViewTransforms != -1 && block_index_ModelConsts_DynamicBufferRegion != -1 && block_index_BatchConsts != -1) {
+        if (p->loc_aTextureUV != -1 && p->loc_aVertexColour != -1 && p->loc_aVertexPosition_BoneLabel != -1 && p->loc_aMaterialSettingsSlotXY_TilePositionXZ != -1 && p->loc_uTextureAtlas != -1 && p->loc_uTextureAtlasSettings != -1 && block_index_ViewTransforms != -1 && block_index_ModelConsts != -1 && block_index_BatchConsts != -1) {
             p->block_index_ViewTransforms = block_index_ViewTransforms;
             p->offset_uCameraPosition = ViewTransforms_offsets[0];
             p->offset_uViewMatrix = ViewTransforms_offsets[1];
@@ -1367,8 +1370,8 @@ static void glLinkProgram(GLuint program) {
             p->block_index_BatchConsts = block_index_BatchConsts;
             p->offset_uAtlasMeta = BatchConsts_offsets[0];
             p->offset_uVertexScale = BatchConsts_offsets[1];
-            p->block_index_ModelConsts = block_index_ModelConsts_DynamicBufferRegion;
-            p->offset_uModelMatrix = ModelConsts_DynamicBufferRegion_offsets[0];
+            p->block_index_ModelConsts = block_index_ModelConsts;
+            p->offset_uModelMatrix = ModelConsts_offsets[0];
             p->block_index_VertexTransformData = block_index_VertexTransformData;
             p->offset_uBoneTransforms = VertexTransformData_offsets[0];
             p->offset_uSmoothSkinning = VertexTransformData_offsets[1];
