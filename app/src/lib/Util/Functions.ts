@@ -402,7 +402,7 @@ export function launchOfficialClient(
 		}
 	};
 	const tryLaunchExisting = () => {
-		if (bolt.hdosInstalledVersion) launch();
+		if (bolt[installedHashName]) launch();
 	};
 
 	// download a list of all the environments, find the "production" environment
