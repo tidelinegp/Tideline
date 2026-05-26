@@ -220,6 +220,7 @@ static GLint gameview_overlay_height = 0;
 static uint8_t gameview_overlay_inited = false;
 
 static size_t frames_without_3d = 0;
+static size_t frames_without_player_model = 0;
 
 #define GLSLHEADER "#version 330 core\n"
 #define GLSLPLUGINEXTENSIONHEADER "#extension GL_ARB_explicit_uniform_location : require\n"
@@ -339,7 +340,7 @@ static void glplugin_draw_region_outline(void* userdata, int16_t x, int16_t y, u
 static void glplugin_read_screen_pixels(int16_t x, int16_t y, uint32_t width, uint32_t height, void* data);
 static void glplugin_copy_screen(void* userdata, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh);
 static void glplugin_game_view_rect(int* x, int* y, int* w, int* h);
-static void glplugin_player_position(int32_t* x, int32_t* y, int32_t* z);
+static uint8_t glplugin_player_position(int32_t* x, int32_t* y, int32_t* z);
 static uint8_t glplugin_vertex_shader_init(struct ShaderFunctions* out, const char* source, int len, char* output, int output_len);
 static uint8_t glplugin_fragment_shader_init(struct ShaderFunctions* out, const char* source, int len, char* output, int output_len);
 static uint8_t glplugin_shaderprogram_init(struct ShaderProgramFunctions* out, void* vertex, void* fragment, char* output, int output_len);
@@ -1995,6 +1996,8 @@ void _bolt_gl_onSwapBuffers(uint32_t window_width, uint32_t window_height) {
         c->depth_of_field_enabled = false;
         frames_without_3d = 0;
     }
+
+    frames_without_player_model += 1;
 }
 
 void _bolt_gl_onCreateContext(void* context, void* shared_context, const struct GLLibFunctions* libgl, void* (*GetProcAddress)(const char*), bool is_important) {
@@ -2779,6 +2782,7 @@ static void drawelements_handle_3d_silhouette(struct GLContext* c) {
     c->player_model_x = (int32_t)roundf(model_matrix[12]);
     c->player_model_y = (int32_t)roundf(model_matrix[13]);
     c->player_model_z = (int32_t)roundf(model_matrix[14]);
+    frames_without_player_model = 0;
 }
 
 static void drawelements_handle_3d_normal(GLsizei count, const unsigned short* indices, struct GLContext* c, const struct GLAttrBinding* attributes) {
@@ -3651,11 +3655,15 @@ static void glplugin_game_view_rect(int* x, int* y, int* w, int* h) {
     *h = c->game_view_h;
 }
 
-static void glplugin_player_position(int32_t* x, int32_t* y, int32_t* z) {
+static uint8_t glplugin_player_position(int32_t* x, int32_t* y, int32_t* z) {
     const struct GLContext* c = _bolt_context();
+    if (frames_without_player_model > 1) {
+        return false;
+    }
     *x = c->player_model_x;
     *y = c->player_model_y;
     *z = c->player_model_z;
+    return true;
 }
 
 static uint8_t glplugin_vertex_shader_init(struct ShaderFunctions* out, const char* source, int len, char* output, int output_len) {

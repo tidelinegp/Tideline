@@ -307,7 +307,7 @@ struct PluginManagedFunctions {
     void (*read_screen_pixels)(int16_t x, int16_t y, uint32_t width, uint32_t height, void* data);
     void (*copy_screen)(void*, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh);
     void (*game_view_rect)(int* x, int* y, int* w, int* h);
-    void (*player_position)(int32_t* x, int32_t* y, int32_t* z);
+    uint8_t (*player_position)(int32_t* x, int32_t* y, int32_t* z);
 
     uint8_t (*vertex_shader_init)(struct ShaderFunctions*, const char* source, int len, char* output, int output_len);
     uint8_t (*fragment_shader_init)(struct ShaderFunctions*, const char* source, int len, char* output, int output_len);

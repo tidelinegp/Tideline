@@ -295,13 +295,17 @@ static int api_weekday(lua_State* state) {
 static int api_playerposition(lua_State* state) {
     int32_t x, y, z;
     const struct PluginManagedFunctions* managed_functions = _bolt_plugin_managed_functions();
-    managed_functions->player_position(&x, &y, &z);
-    struct Point3D* point = lua_newuserdata(state, sizeof(struct Point3D));
-    point->xyzh.ints[0] = x;
-    point->xyzh.ints[1] = y;
-    point->xyzh.ints[2] = z;
-    point->integer = true;
-    SETMETATABLE(point)
+    const uint8_t valid = managed_functions->player_position(&x, &y, &z);
+    if (valid) {
+        struct Point3D* point = lua_newuserdata(state, sizeof(struct Point3D));
+        point->xyzh.ints[0] = x;
+        point->xyzh.ints[1] = y;
+        point->xyzh.ints[2] = z;
+        point->integer = true;
+        SETMETATABLE(point)
+    } else {
+        lua_pushnil(state);
+    }
     return 1;
 }
 
