@@ -80,6 +80,7 @@ struct GLProgram {
     GLint loc_sSourceTex;
     GLint loc_sBlurFarTex;
     GLint loc_sTexture;
+    GLint loc_uColourTexture;
     GLuint block_index_ViewTransforms;
     GLint offset_uCameraPosition;
     GLint offset_uViewMatrix;
@@ -151,7 +152,7 @@ struct GLContext {
     GLenum active_texture;
     GLuint current_draw_framebuffer;
     GLuint current_read_framebuffer;
-    GLuint game_view_part_framebuffer;
+    GLuint game_view_uColourTexture;
     GLint game_view_sSourceTex;
     GLint game_view_sSceneHDRTex;
     GLint depth_of_field_sSourceTex;
@@ -795,7 +796,7 @@ static void context_init(struct GLContext* context, void* egl_context, void* egl
     context->texture_units = calloc(MAX_TEXTURE_UNITS, sizeof(struct TextureUnit));
     context->player_model_tex = -1;
     context->depth_tex = -1;
-    context->game_view_part_framebuffer = -1;
+    context->game_view_uColourTexture = -1;
     context->game_view_sSourceTex = -1;
     context->recalculate_depth_tex = true;
     context->blend_rgb_s = GL_ONE;
@@ -1222,6 +1223,7 @@ static GLuint glCreateProgram() {
     program->loc_uSecondsSinceStart = -1;
     program->loc_sSceneHDRTex = -1;
     program->loc_sTexture = -1;
+    program->loc_uColourTexture = -1;
     program->block_index_ViewTransforms = -1;
     program->offset_uCameraPosition = -1;
     program->offset_uViewMatrix = -1;
@@ -1303,7 +1305,7 @@ static void glLinkProgram(GLuint program) {
     const GLchar* ViewTransforms_var_names[] = {"uCameraPosition", "uViewMatrix", "uProjectionMatrix", "uViewProjMatrix", "uInvViewMatrix"};
     const GLchar* BatchConsts_var_names[] = {"uAtlasMeta", "uVertexScale"};
     const GLchar* VertexTransformData_var_names[] = {"uBoneTransforms", "uSmoothSkinning"};
-    const GLchar* ModelConsts_var_names[] = {"uModelMatrix"};
+    const GLchar* ModelConsts_DynamicBufferRegion_var_names[] = {"uModelMatrix"};
     const GLchar* ParticleConsts_var_names[] = {"uParticleEmitterTransforms", "uParticleEmitterTransformRanges", "uAtlasMeta"};
     const GLchar* TerrainConsts_var_names[] = {"uGridSize", "uModelMatrix"};
     const GLchar* GUIConsts_var_names[] = {"uProjectionMatrix"};
@@ -1320,7 +1322,7 @@ static void glLinkProgram(GLuint program) {
     DEFINEUBO(ViewTransforms)
     DEFINEUBO(BatchConsts)
     DEFINEUBO(VertexTransformData)
-    DEFINEUBO(ModelConsts)
+    DEFINEUBO(ModelConsts_DynamicBufferRegion)
     DEFINEUBO(ParticleConsts)
     DEFINEUBO(TerrainConsts)
     DEFINEUBO(GUIConsts)
@@ -1336,6 +1338,7 @@ static void glLinkProgram(GLuint program) {
         p->loc_sSourceTex = gl.GetUniformLocation(program, "sSourceTex");
         p->loc_sBlurFarTex = gl.GetUniformLocation(program, "sBlurFarTex");
         p->loc_sTexture = gl.GetUniformLocation(program, "sTexture");
+        p->loc_uColourTexture = gl.GetUniformLocation(program, "uColourTexture");
         if (block_index_ViewTransforms != -1 && block_index_TerrainConsts != -1) {
             p->block_index_ViewTransforms = block_index_ViewTransforms;
             p->offset_uCameraPosition = ViewTransforms_offsets[0];
@@ -1353,7 +1356,7 @@ static void glLinkProgram(GLuint program) {
             p->offset_uProjectionMatrix = GUIConsts_offsets[0];
             p->is_2d = 1;
         }
-        if (p->loc_aTextureUV != -1 && p->loc_aVertexColour != -1 && p->loc_aVertexPosition_BoneLabel != -1 && p->loc_aMaterialSettingsSlotXY_TilePositionXZ != -1 && p->loc_uTextureAtlas != -1 && p->loc_uTextureAtlasSettings != -1 && block_index_ViewTransforms != -1 && block_index_ModelConsts != -1 && block_index_BatchConsts != -1) {
+        if (p->loc_aTextureUV != -1 && p->loc_aVertexColour != -1 && p->loc_aVertexPosition_BoneLabel != -1 && p->loc_aMaterialSettingsSlotXY_TilePositionXZ != -1 && p->loc_uTextureAtlas != -1 && p->loc_uTextureAtlasSettings != -1 && block_index_ViewTransforms != -1 && block_index_ModelConsts_DynamicBufferRegion != -1 && block_index_BatchConsts != -1) {
             p->block_index_ViewTransforms = block_index_ViewTransforms;
             p->offset_uCameraPosition = ViewTransforms_offsets[0];
             p->offset_uViewMatrix = ViewTransforms_offsets[1];
@@ -1363,8 +1366,8 @@ static void glLinkProgram(GLuint program) {
             p->block_index_BatchConsts = block_index_BatchConsts;
             p->offset_uAtlasMeta = BatchConsts_offsets[0];
             p->offset_uVertexScale = BatchConsts_offsets[1];
-            p->block_index_ModelConsts = block_index_ModelConsts;
-            p->offset_uModelMatrix = ModelConsts_offsets[0];
+            p->block_index_ModelConsts = block_index_ModelConsts_DynamicBufferRegion;
+            p->offset_uModelMatrix = ModelConsts_DynamicBufferRegion_offsets[0];
             p->block_index_VertexTransformData = block_index_VertexTransformData;
             p->offset_uBoneTransforms = VertexTransformData_offsets[0];
             p->offset_uSmoothSkinning = VertexTransformData_offsets[1];
@@ -1881,17 +1884,7 @@ static void glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1
     gl.GetFramebufferAttachmentParameteriv(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &read_tex_id);
     gl.GetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &draw_tex_id);
 
-    if (c->current_draw_framebuffer == 0 && c->game_view_part_framebuffer != c->current_read_framebuffer) {
-        c->game_view_part_framebuffer = c->current_read_framebuffer;
-        c->recalculate_sSceneHDRTex = true;
-        c->game_view_sSceneHDRTex = -1;
-        c->game_view_sSourceTex = -1;
-        c->does_blit_3d_target = false;
-        c->depth_of_field_enabled = false;
-        c->game_view_x = dstX0;
-        c->game_view_y = (GLint)gl_height - dstY1;
-        printf("new game_view_part_framebuffer %u...\n", c->current_read_framebuffer);
-    } else if (srcX0 == 0 && dstX0 == 0 && srcY0 == 0 && dstY0 == 0 && srcX1 == dstX1 && srcY1 == dstY1 && c->current_draw_framebuffer != 0) {
+    if (srcX0 == 0 && dstX0 == 0 && srcY0 == 0 && dstY0 == 0 && srcX1 == dstX1 && srcY1 == dstY1 && c->current_draw_framebuffer != 0) {
         struct GLTexture2D* target_tex = context_get_texture(c, draw_tex_id);
         if (!c->does_blit_3d_target && target_tex && target_tex->width == dstX1 && target_tex->height == dstY1) {
             if (!c->depth_of_field_enabled && target_tex->id == c->game_view_sSceneHDRTex) {
@@ -1910,11 +1903,6 @@ static void glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1
                 read_tex->icon.model_count = false;
             }
         }
-    }
-
-    if (c->current_draw_framebuffer == 0 && read_tex_id != 0 && pending_gameview_overlay_tex == read_tex_id) {
-        pending_gameview_overlay_tex = 0;
-        draw_gameview_overlay(c);
     }
 
     LOG("glBlitFramebuffer end\n");
@@ -1999,10 +1987,10 @@ void _bolt_gl_onSwapBuffers(uint32_t window_width, uint32_t window_height) {
     if (frames_without_3d > 10) {
         // we may have lost the 3D pipeline, flush everything and recalculate it
         struct GLContext* c = _bolt_context();
-        c->game_view_part_framebuffer = c->current_read_framebuffer;
         c->recalculate_sSceneHDRTex = true;
         c->game_view_sSceneHDRTex = -1;
         c->game_view_sSourceTex = -1;
+        c->game_view_uColourTexture = -1;
         c->does_blit_3d_target = false;
         c->depth_of_field_enabled = false;
         frames_without_3d = 0;
@@ -2103,14 +2091,15 @@ FXAA: backbuffer <- blit* <- sSourceTex <- sSceneHDRTex <- (sSourceTex <- full g
 MSAA: backbuffer <- blit* <- sSceneHDRTex <- sSourceTex** <- full-blit <- (individual 3d objects)
 FXAA+MSAA: backbuffer <- blit* <- sSourceTex <- sSceneHDRTex <- sSourceTex** <- full-blit <- (individual 3d objects)
 
-*blits to the game view area of the screen; omitted if the game view fills the entire window
+*copies full texture to the game view area of the screen; omitted if the game view fills the entire window
+ - also note this step was changed from glBlitFramebuffer to glDrawArrays+uColourTexture on 2026-05-26
 **only done if "depth of field" is enabled - identifiable by sBlurNearTex and sBlurFarTex being present
 
 sSourceTex and sSceneHDRTex are 6-vertex renders using glDrawArrays, the individual objects are drawn using glDrawElements.
 
 hunt strategy is as follows:
 1.  start a hunt (recalculate_sSceneHDRTex=true) if part_framebuffer, sSourceTex or sSceneHDRTex are seen to have changed
-2a. find part_framebuffer by looking for any framebuffers that are blitted to the backbuffer
+2a. find part_framebuffer by looking for any framebuffers that are copied to the backbuffer, either by blitting or as uColourTexture
 2b. find sSourceTex by looking for an sSourceTex glDrawArrays call to the backbuffer or the part_framebuffer
 2c. find sSceneHDRTex by looking for an sSceneHDRTex glDrawArrays call to the backbuffer, part_framebuffer, or sSourceTex
 3.  assume sSceneHDRTex is the render target until further notice, and set recalculate_sSceneHDRTex=false
@@ -2148,11 +2137,9 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                     c->does_blit_3d_target = false;
                     c->depth_of_field_enabled = false;
                     printf("new direct sSceneHDRTex %i\n", c->target_3d_tex);
-                } else if (c->recalculate_sSceneHDRTex && !c->depth_of_field_enabled && (c->game_view_part_framebuffer == c->current_draw_framebuffer || c->game_view_sSourceTex == target_tex_id)) {
+                } else if (c->recalculate_sSceneHDRTex && !c->depth_of_field_enabled && (c->game_view_uColourTexture == target_tex_id || c->game_view_sSourceTex == target_tex_id)) {
                     c->game_view_sSceneHDRTex = (GLint)source_tex->id;
                     c->target_3d_tex = c->game_view_sSceneHDRTex;
-                    c->game_view_w = source_tex->width;
-                    c->game_view_h = source_tex->height;
                     c->recalculate_sSceneHDRTex = false;
                     printf("new sSceneHDRTex %i\n", c->target_3d_tex);
                 } else if (target_tex && source_tex->icon.model_count && source_tex->width == GAME_ITEM_BIGICON_SIZE && source_tex->height == GAME_ITEM_BIGICON_SIZE && target_tex->width == GAME_ITEM_BIGICON_SIZE && target_tex->height == GAME_ITEM_BIGICON_SIZE) {
@@ -2203,9 +2190,11 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                     c->depth_of_field_enabled = false;
                     c->game_view_x = 0;
                     c->game_view_y = 0;
+                    c->game_view_w = source_tex->width;
+                    c->game_view_h = source_tex->height;
                     c->recalculate_sSceneHDRTex = true;
                     printf("new direct sSourceTex %i...\n", c->game_view_sSourceTex);
-                } else if (c->recalculate_sSceneHDRTex && c->game_view_part_framebuffer == c->current_draw_framebuffer) {
+                } else if (c->recalculate_sSceneHDRTex && c->game_view_uColourTexture == target_tex_id) {
                     c->game_view_sSourceTex = (GLint)source_tex->id;
                     printf("new sSourceTex %i...\n", c->game_view_sSourceTex);
                 } else if (target_tex && source_tex->icon.model_count && source_tex->width == GAME_ITEM_BIGICON_SIZE && source_tex->height == GAME_ITEM_BIGICON_SIZE && target_tex->width == GAME_ITEM_BIGICON_SIZE && target_tex->height == GAME_ITEM_BIGICON_SIZE) {
@@ -2213,7 +2202,28 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                     source_tex->icon.model_count = 0;
                 }
             }
-        } else if (!player_model_tex_seen && c->bound_program->loc_sTexture != -1 && c->current_draw_framebuffer == 0) {
+        } else if (c->bound_program->loc_uColourTexture != -1) {
+            gl.GetUniformiv(c->bound_program->id, c->bound_program->loc_uColourTexture, &source_tex_unit);
+            const GLuint source_tex_id = c->texture_units[source_tex_unit].texture_2d;
+            if (c->current_draw_framebuffer == 0 && c->game_view_uColourTexture != source_tex_id) {
+                c->game_view_uColourTexture = source_tex_id;
+                c->recalculate_sSceneHDRTex = true;
+                c->game_view_sSceneHDRTex = -1;
+                c->game_view_sSourceTex = -1;
+                c->does_blit_3d_target = false;
+                c->depth_of_field_enabled = false;
+                c->game_view_x = c->viewport_x;
+                c->game_view_y = c->viewport_y;
+                c->game_view_w = c->viewport_w;
+                c->game_view_h = c->viewport_h;
+                printf("new game_view_uColourTexture %u...\n", source_tex_id);
+            }
+            if (c->current_draw_framebuffer == 0 && pending_gameview_overlay_tex == source_tex_id) {
+                pending_gameview_overlay_tex = 0;
+                draw_gameview_overlay(c);
+            }
+        }
+        else if (!player_model_tex_seen && c->bound_program->loc_sTexture != -1 && c->current_draw_framebuffer == 0) {
             gl.GetUniformiv(c->bound_program->id, c->bound_program->loc_sTexture, &source_tex_unit);
             struct GLTexture2D* source_tex = CONTEXT_GET_TEX_BINDING(c, source_tex_unit, recent);
             if (source_tex && source_tex->width == c->game_view_w && source_tex->height == c->game_view_h) {
