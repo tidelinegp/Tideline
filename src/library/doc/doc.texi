@@ -412,6 +412,11 @@ the player model, which is usually on the ground between the model's
 feet during a normal standing animation. Also see
 @ref{appendix-world-coordinates}.
 
+If the player character's position is unknown, this function returns
+nil. This mainly happens when the player is in the lobby, but can
+happen for a number of other reasons, such as the player using freecam
+to hide their player character entirely off-screen.
+
 @example lua
 @verbatim
 local worldpoint = bolt.playerposition()
