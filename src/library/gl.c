@@ -2201,6 +2201,15 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                     target_tex->icon = source_tex->icon;
                     source_tex->icon.model_count = 0;
                 }
+
+                if (pending_gameview_overlay_tex == source_tex->id) {
+                    if (c->current_draw_framebuffer == 0) {
+                        draw_gameview_overlay(c);
+                        pending_gameview_overlay_tex = 0;
+                    } else {
+                        pending_gameview_overlay_tex = target_tex_id;
+                    }
+                }
             }
         } else if (c->bound_program->loc_uColourTexture != -1) {
             gl.GetUniformiv(c->bound_program->id, c->bound_program->loc_uColourTexture, &source_tex_unit);
