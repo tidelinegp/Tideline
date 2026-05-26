@@ -78,7 +78,11 @@ const downloadWithProgress = async (
 		return reportError('cannot estimate download size');
 	}
 	const downloadSize = parseInt(downloadSizeStr);
-	if (!downloadSizeStr) {
+	// a note about this check: parseInt reads digits and ignores any trailing non-digits, so
+	// parseInt("123a45") returns 123. A string with no leading digits, such as parseInt("a"),
+	// returns NaN, which in gt/lt comparators always returns false. That's why this check is
+	// worded in a slightly odd way.
+	if (!(downloadSize > 0)) {
 		return reportError('cannot estimate download size');
 	}
 
