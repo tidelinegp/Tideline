@@ -2220,7 +2220,8 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
         } else if (c->bound_program->loc_uColourTexture != -1) {
             gl.GetUniformiv(c->bound_program->id, c->bound_program->loc_uColourTexture, &source_tex_unit);
             const GLuint source_tex_id = c->texture_units[source_tex_unit].texture_2d;
-            if (c->current_draw_framebuffer == 0 && c->game_view_uColourTexture != source_tex_id) {
+            const GLint inverted_gvy = (GLint)gl_height - (c->viewport_y + c->viewport_h);
+            if (c->current_draw_framebuffer == 0 && (c->game_view_uColourTexture != source_tex_id || c->game_view_x != c->viewport_x || c->game_view_y != inverted_gvy || c->game_view_w != c->viewport_w || c->game_view_h != c->viewport_h)) {
                 c->game_view_uColourTexture = source_tex_id;
                 c->recalculate_sSceneHDRTex = true;
                 c->game_view_sSceneHDRTex = -1;
@@ -2228,7 +2229,7 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                 c->does_blit_3d_target = false;
                 c->depth_of_field_enabled = false;
                 c->game_view_x = c->viewport_x;
-                c->game_view_y = c->viewport_y;
+                c->game_view_y = inverted_gvy;
                 c->game_view_w = c->viewport_w;
                 c->game_view_h = c->viewport_h;
                 printf("new game_view_uColourTexture %u...\n", source_tex_id);
