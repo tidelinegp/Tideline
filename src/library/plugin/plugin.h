@@ -80,6 +80,9 @@ struct Vertex3DFunctions {
     /// Returns the vertex X Y and Z, in model coordinates.
     void (*xyz)(size_t index, void* userdata, struct Point3D* out);
 
+    /// Returns the vertex X Y and Z, in model coordinates, after vertex_scale has been applied.
+    void (*xyz_scaled)(size_t index, void* userdata, struct Point3D* out);
+
     /// Returns a meta-ID for the texture associated with this vertex.
     uint32_t (*atlas_meta)(size_t index, void* userdata);
 
@@ -420,11 +423,12 @@ struct Render3D {
     uint32_t vertex_count;
     uint32_t tex_width;
     uint32_t tex_height;
-    uint8_t is_animated;
+    float vertex_scale;
     struct Vertex3DFunctions vertex_functions;
     struct TextureFunctions texture_functions;
     struct MatrixFunctions matrix_functions;
     struct CameraFunctions camera_functions;
+    uint8_t is_animated;
 };
 
 struct RenderParticles {

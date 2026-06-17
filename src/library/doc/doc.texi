@@ -3024,6 +3024,39 @@ local modelpoint = event:vertexpoint(1)
 @end verbatim
 @end example
 
+@node render3d-vertexpointscaled
+@subsection vertexpointscaled
+
+Given a vertex number, returns a @ref{objects-point} representing the
+vertex's model coordinates, scaled by the scale value this model is
+currently being drawn at. This is equivalent to calling
+@ref{render3d-vertexpoint} and multiplying each coordinate by
+@ref{render3d-scale}.
+
+@example lua
+@verbatim
+local scaledpoint = event:vertexpointscaled(1)
+@end verbatim
+@end example
+
+@node render3d-scale
+@subsection scale
+
+Returns the scale this model is being drawn at relative to the size of
+its original model. The model coordinates are multiplied by this number
+before applying the model matrix, and also before applying the animation
+matrix, if any.
+
+To get the original integer coordinates of a vertex, ignoring the scale,
+use @ref{render3d-vertexpoint}. To get the coordinates with the scale
+applied, use @ref{render3d-vertexpointscaled}.
+
+@example lua
+@verbatim
+local scale = event:scale()
+@end verbatim
+@end example
+
 @node render3d-modelmatrix
 @subsection modelmatrix
 

@@ -287,6 +287,7 @@ static void glplugin_drawelements_vertex2d_atlas_details(size_t index, void* use
 static void glplugin_drawelements_vertex2d_uv(size_t index, void* userdata, double* out, uint8_t* discard);
 static void glplugin_drawelements_vertex2d_colour(size_t index, void* userdata, double* out);
 static void glplugin_drawelements_vertex3d_xyz(size_t index, void* userdata, struct Point3D* out);
+static void glplugin_drawelements_vertex3d_xyz_scaled(size_t index, void* userdata, struct Point3D* out);
 static uint32_t glplugin_drawelements_vertex3d_atlas_meta(size_t index, void* userdata);
 static void glplugin_drawelements_vertex3d_meta_xywh(size_t meta, void* userdata, int32_t* out);
 static void glplugin_drawelements_vertex3d_uv(size_t index, void* userdata, double* out);
@@ -429,6 +430,7 @@ struct GLPluginDrawElementsVertex3DUserData {
     struct GLContext* c;
     const unsigned short* indices;
     int atlas_scale;
+    GLfloat vertex_scale;
     const struct GLTexture2D* settings_atlas;
     const struct GLAttrBinding* xy_xz;
     const struct GLAttrBinding* xyz_bone;
@@ -2805,12 +2807,16 @@ static void drawelements_handle_3d_normal(GLsizei count, const unsigned short* i
     gl.GetIntegeri_v(GL_UNIFORM_BUFFER_BINDING, ubo_binding, &ubo_batch_index);
     gl.GetActiveUniformBlockiv(c->bound_program->id, c->bound_program->block_index_ModelConsts, GL_UNIFORM_BLOCK_BINDING, &ubo_binding);
     gl.GetIntegeri_v(GL_UNIFORM_BUFFER_BINDING, ubo_binding, &ubo_model_index);
-    const GLfloat atlas_scale = *((GLfloat*)(((uint8_t*)context_get_buffer(c, ubo_batch_index)->data) + c->bound_program->offset_uAtlasMeta) + 1);
+
+    const struct GLArrayBuffer* batch_buffer = context_get_buffer(c, ubo_batch_index);
+    const GLfloat atlas_scale = *((GLfloat*)(((uint8_t*)batch_buffer->data) + c->bound_program->offset_uAtlasMeta) + 1);
+    const GLfloat vertex_scale = *(GLfloat*)(((uint8_t*)batch_buffer->data) + c->bound_program->offset_uVertexScale);
 
     struct GLPluginDrawElementsVertex3DUserData vertex_userdata;
     vertex_userdata.c = c;
     vertex_userdata.indices = indices;
     vertex_userdata.atlas_scale = (int)roundf(atlas_scale);
+    vertex_userdata.vertex_scale = vertex_scale;
     vertex_userdata.settings_atlas = tex_settings;
     vertex_userdata.xy_xz = &attributes[c->bound_program->loc_aMaterialSettingsSlotXY_TilePositionXZ];
     vertex_userdata.xyz_bone = &attributes[c->bound_program->loc_aVertexPosition_BoneLabel];
@@ -2837,11 +2843,13 @@ static void drawelements_handle_3d_normal(GLsizei count, const unsigned short* i
 
     struct Render3D render;
     render.vertex_count = count;
+    render.vertex_scale = vertex_scale;
     render.tex_width = tex->width;
     render.tex_height = tex->height;
     render.is_animated = c->bound_program->block_index_VertexTransformData != -1;
     render.vertex_functions.userdata = &vertex_userdata;
     render.vertex_functions.xyz = glplugin_drawelements_vertex3d_xyz;
+    render.vertex_functions.xyz_scaled = glplugin_drawelements_vertex3d_xyz_scaled;
     render.vertex_functions.atlas_meta = glplugin_drawelements_vertex3d_atlas_meta;
     render.vertex_functions.atlas_xywh = glplugin_drawelements_vertex3d_meta_xywh;
     render.vertex_functions.uv = glplugin_drawelements_vertex3d_uv;
@@ -3136,6 +3144,18 @@ static void glplugin_drawelements_vertex3d_xyz(size_t index, void* userdata, str
         out->xyzh.floats[3] = 1.0;
         out->integer = false;
     }
+}
+
+static void glplugin_drawelements_vertex3d_xyz_scaled(size_t index, void* userdata, struct Point3D* out) {
+    const struct GLPluginDrawElementsVertex3DUserData* data = userdata;
+    float pos[3];
+    attr_get_binding(data->c, data->xyz_bone, data->indices[index], 3, pos);
+    out->xyzh.floats[0] = (double)pos[0];
+    out->xyzh.floats[1] = (double)pos[1];
+    out->xyzh.floats[2] = (double)pos[2];
+    out->xyzh.floats[3] = 1.0 / data->vertex_scale;
+    out->integer = false;
+    out->homogenous = true;
 }
 
 static uint32_t glplugin_drawelements_vertex3d_atlas_meta(size_t index, void* userdata) {

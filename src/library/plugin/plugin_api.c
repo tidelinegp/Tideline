@@ -1384,6 +1384,12 @@ static int api_render3d_vertexcount(lua_State* state) {
     return 1;
 }
 
+static int api_render3d_scale(lua_State* state) {
+    const struct Render3D* render = require_self_userdata(state, "vertexscale");
+    lua_pushnumber(state, render->vertex_scale);
+    return 1;
+}
+
 static int api_render3d_vertexpoint(lua_State* state) {
     const struct Render3D* render = require_self_userdata(state, "vertexpoint");
     const lua_Integer index = lua_tointeger(state, 2);
@@ -1393,6 +1399,19 @@ static int api_render3d_vertexpoint(lua_State* state) {
     }
     struct Point3D* point = lua_newuserdata(state, sizeof(struct Point3D));
     render->vertex_functions.xyz(index - 1, render->vertex_functions.userdata, point);
+    SETMETATABLE(point)
+    return 1;
+}
+
+static int api_render3d_vertexpointscaled(lua_State* state) {
+    const struct Render3D* render = require_self_userdata(state, "vertexpointscaled");
+    const lua_Integer index = lua_tointeger(state, 2);
+    if (index < 1 || index > render->vertex_count) {
+        lua_pushfstring(state, "vertexpointscaled: out-of-bounds vertex number: index %d, vertex count is %d", index, render->vertex_count);
+        lua_error(state);
+    }
+    struct Point3D* point = lua_newuserdata(state, sizeof(struct Point3D));
+    render->vertex_functions.xyz_scaled(index - 1, render->vertex_functions.userdata, point);
     SETMETATABLE(point)
     return 1;
 }
@@ -2586,6 +2605,8 @@ static const struct ApiFuncTemplate render2d_functions[] = {
 static const struct ApiFuncTemplate render3d_functions[] = {
     BOLTFUNC(vertexcount, render3d),
     BOLTFUNC(vertexpoint, render3d),
+    BOLTFUNC(vertexpointscaled, render3d),
+    BOLTFUNC(scale, render3d),
     BOLTFUNC(modelmatrix, render3d),
     BOLTFUNC(viewmatrix, render3d),
     BOLTFUNC(projmatrix, render3d),
