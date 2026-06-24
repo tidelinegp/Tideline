@@ -9,19 +9,15 @@ export const enum Platform {
 
 export interface BoltEnv {
 	provider: string;
-	origin: string;
 	origin_2fa: string;
-	redirect: string;
-	clientid: string;
 	api: string;
-	auth_api: string;
 	profile_api: string;
-	shield_url: string;
 	content_url: string;
 	direct6_url: string;
 	default_config_uri: string;
 	psa_url: string;
 	games: string[];
+	disclaimer: string[];
 }
 
 export interface Bolt {

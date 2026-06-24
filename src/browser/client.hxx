@@ -1,5 +1,6 @@
 #ifndef _BOLT_CLIENT_HXX_
 #define _BOLT_CLIENT_HXX_
+#include "include/cef_values.h"
 #if defined(BOLT_PLUGINS)
 #include "window_plugin.hxx"
 #include "window_osr.hxx"
@@ -12,6 +13,8 @@
 #include "include/views/cef_window_delegate.h"
 #include "app.hxx"
 #include "../browser/window_launcher.hxx"
+#include "../browser/window_login.hxx"
+#include "session.hxx"
 
 #include <filesystem>
 #include <mutex>
@@ -43,8 +46,15 @@ namespace Browser {
 		/// but this function may be used to open another after previous ones have been closed.
 		void OpenLauncher();
 
+		/// Either opens a login window, or focuses an existing one. No more than one login window
+		/// may exist at any time.
+		void OpenLoginWindow();
+
 		/// Called by Browser::Launcher when closed.
 		void OnLauncherClosed();
+
+		/// Called by Browser::LoginWindow when closed.
+		void OnLoginWindowClosed();
 
 		/// Checks if it's safe to call CefQuitMessageLoop() and exit the process, and if so, does so.
 		/// Implementation differs depending on which build features are enabled.
@@ -52,6 +62,20 @@ namespace Browser {
 
 		/// Handler to be called when a new CefWindow is created. Must be called before Show()
 		void OnBoltWindowCreated(CefRefPtr<CefWindow>);
+
+		/// Notifies that login_window is about to self-close due to an auth error
+		void OnAuthError(CefString&);
+
+		/// Adds a new session, usually the end result of a LoginWindow
+		void AddSession(const Session&);
+
+		/// Creates a CefListValue of sessions from this->sessions, for sending to the render process
+		/// assumes sessions_lock is already obtained
+		CefRefPtr<CefListValue> CreateSessionsList();
+
+		/// Writes all active sessions to the credentials file
+		/// assumes sessions_lock is already obtained
+		void WriteSessions();
 
 #if defined(BOLT_PLUGINS)
 		/// Creates and binds an IPC socket, ready for IPCRun() to accept connections - OS-specific
@@ -112,16 +136,15 @@ namespace Browser {
 		void OnContextInitialized() override;
 
 		private:
-			DISALLOW_COPY_AND_ASSIGN(Client);
-			IMPLEMENT_REFCOUNTING(Client);
-
 			void Exit();
 			Details LauncherDetails();
+			void TryAssignSessions(CefRefPtr<CefValue>); // sets this->sessions from a JSON object that comes from the creds file
 
 			bool show_devtools;
 			std::filesystem::path config_dir;
 			std::filesystem::path data_dir;
 			std::filesystem::path runtime_dir;
+			std::filesystem::path creds_path;
 
 #if defined(BOLT_PLUGINS)
 			struct ActivePlugin: ::FileManager::Directory {
@@ -160,7 +183,15 @@ namespace Browser {
 
 			// Mutex-locked - may be accessed from either UI thread (most of the time) or IO thread (GetResourceRequestHandler)
 			CefRefPtr<Browser::Launcher> launcher;
+			CefRefPtr<Browser::LoginWindow> login_window;
 			std::mutex launcher_lock;
+
+			std::vector<Session> sessions;
+			std::mutex sessions_lock;
+			bool has_sessions;
+		
+		IMPLEMENT_REFCOUNTING(Client);
+		DISALLOW_COPY_AND_ASSIGN(Client);
 	};
 }
 

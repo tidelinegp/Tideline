@@ -3,6 +3,7 @@
 
 #include "../file_manager.hxx"
 
+#include "include/base/cef_macros.h"
 #include "include/cef_base.h"
 #include "include/cef_resource_request_handler.h"
 #include "include/cef_urlrequest.h"
@@ -60,8 +61,8 @@ namespace Browser {
 	/// https://github.com/chromiumembedded/cef/blob/7258/include/cef_resource_request_handler.h
 	/// https://github.com/chromiumembedded/cef/blob/7258/include/cef_resource_handler.h
 	/// https://github.com/chromiumembedded/cef/blob/7258/include/cef_urlrequest.h#L137
-	struct DefaultURLHandler: public CefResourceRequestHandler, CefResourceHandler, CefURLRequestClient {
-		DefaultURLHandler(CefRefPtr<CefRequest>);
+	struct URLHandler: public CefResourceRequestHandler, CefResourceHandler, CefURLRequestClient {
+		URLHandler(CefRefPtr<CefRequest>, CefRefPtr<CefRequestContext>);
 
 		CefResourceRequestHandler::ReturnValue OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, CefRefPtr<CefCallback> callback) override;
 		CefRefPtr<CefResourceHandler> GetResourceHandler(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request) override;
@@ -78,15 +79,31 @@ namespace Browser {
 		void OnDownloadData(CefRefPtr<CefURLRequest> request, const void* data, size_t data_length) override;
 		bool GetAuthCredentials(bool isProxy, const CefString& host, int port, const CefString& realm, const CefString& scheme, CefRefPtr<CefAuthCallback> callback) override;
 
-		private:
+		protected:
 			CefRefPtr<CefURLRequest> url_request;
 			CefRefPtr<CefCallback> urlrequest_callback;
 			bool urlrequest_complete;
 			bool headers_checked;
 			std::vector<uint8_t> data;
 			size_t cursor;
-			IMPLEMENT_REFCOUNTING(DefaultURLHandler);
-			DISALLOW_COPY_AND_ASSIGN(DefaultURLHandler);
+
+			// if these are set by the time OnRequestComplete is run, this data will be returned.
+			// otherwise, this->data will be returned as-is.
+			const char* return_data_ptr;
+			uint64_t return_data_length;
+
+			int status_override;
+			const char* mime_type_override;
+			const char* location_override;
+		
+		IMPLEMENT_REFCOUNTING(URLHandler);
+		DISALLOW_COPY_AND_ASSIGN(URLHandler);
+	};
+
+	// URLHandler that passes the response as-is, but with an access-control-allow-origin header added
+	struct URLHandlerNoCORS: public URLHandler {
+		URLHandlerNoCORS(CefRefPtr<CefRequest> request, CefRefPtr<CefRequestContext> context): URLHandler(request, context) {}
+		void GetResponseHeaders(CefRefPtr<CefResponse> response, int64_t& response_length, CefString& redirectUrl) override;
 	};
 
 	#endif

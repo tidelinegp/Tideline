@@ -19,6 +19,7 @@ typedef std::string QSTRING;
 #define PQTOSTRING ToString
 #endif
 
+// for use in ParseQuery - assigns a URI-decoded CefString
 #define PQCEFSTRING(KEY) \
 if (key == #KEY) { \
 	has_##KEY = true; \
@@ -26,10 +27,19 @@ if (key == #KEY) { \
 	return; \
 }
 
+// for use in ParseQuery - assigns a URI-decoded QSTRING (std::string or std::wstring, depending on platform)
 #define PQSTRING(KEY) \
 if (key == #KEY) { \
 	has_##KEY = true; \
 	KEY = CefURIDecode(std::string(val), true, (cef_uri_unescape_rule_t)(UU_SPACES | UU_PATH_SEPARATORS | UU_URL_SPECIAL_CHARS_EXCEPT_PATH_SEPARATORS | UU_REPLACE_PLUS_WITH_SPACE)).PQTOSTRING(); \
+	return; \
+}
+
+// for use in ParseQuery - assigns a std::string_view referencing the original query string, not URI-decoded
+#define PQSTRINGVIEW(KEY) \
+if (key == #KEY) { \
+	has_##KEY = true; \
+	KEY = val; \
 	return; \
 }
 

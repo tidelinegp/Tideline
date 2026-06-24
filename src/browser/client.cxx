@@ -1,5 +1,6 @@
 #include "client.hxx"
 #include "include/internal/cef_string.h"
+#include "window_login.hxx"
 #include <filesystem>
 
 #if defined(BOLT_PLUGINS)
@@ -11,6 +12,7 @@
 
 #include "include/cef_app.h"
 #include "include/cef_values.h"
+#include "include/cef_parser.h"
 #include "include/internal/cef_types.h"
 #include "resource_handler.hxx"
 #include "window_launcher.hxx"
@@ -50,7 +52,7 @@ Browser::Client::Client(CefRefPtr<Browser::App> app,std::filesystem::path config
 #if defined(BOLT_PLUGINS)
 	next_client_uid(0), next_plugin_uid(0),
 #endif
-	show_devtools(SHOW_DEVTOOLS), config_dir(config_dir), data_dir(data_dir), runtime_dir(runtime_dir), launcher(nullptr)
+	show_devtools(SHOW_DEVTOOLS), config_dir(config_dir), data_dir(data_dir), runtime_dir(runtime_dir), launcher(nullptr), has_sessions(false)
 {
 	app->SetBrowserProcessHandler(this);
 
@@ -65,36 +67,73 @@ void Browser::Client::OpenLauncher() {
 	std::lock_guard<std::mutex> _(this->launcher_lock);
 	if (this->launcher) {
 		this->launcher->Focus();
-	} else {
-		this->launcher = new Browser::Launcher(this, this->LauncherDetails(), this->show_devtools, this, this->config_dir, this->data_dir);
+		return;
+	}
+
+	// build dict of stuff that we need to initialise the render process with
+	this->sessions_lock.lock();
+	CefRefPtr<CefListValue> session_list = nullptr;
+	if (this->has_sessions) session_list = this->CreateSessionsList();
+	this->sessions_lock.unlock();
+
+	this->launcher = new Browser::Launcher(this, this->LauncherDetails(), this->show_devtools, this, this->config_dir, this->data_dir, session_list);
+}
+
+void Browser::Client::OpenLoginWindow() {
+	fmt::print("[B] OpenLoginWindow\n");
+	std::lock_guard<std::mutex> _(this->launcher_lock);
+	if (this->login_window) {
+		this->login_window->Focus();
+	} else if (this->launcher) {
+		int x, y;
+		this->launcher->GetWindowPos(&x, &y);
+		this->login_window = new Browser::LoginWindow(this, x, y, this->show_devtools);
 	}
 }
 
 void Browser::Client::OnLauncherClosed() {
 	this->launcher_lock.lock();
 	this->launcher = nullptr;
+	const bool has_login_window = this->login_window != nullptr;
+	if (has_login_window) {
+		this->login_window->Close();
+	}
 	this->launcher_lock.unlock();
-	this->TryExit(false);
+	if (!has_login_window) {
+		this->TryExit(false);
+	}
+}
+
+void Browser::Client::OnLoginWindowClosed() {
+	this->launcher_lock.lock();
+	this->login_window = nullptr;
+	const bool has_launcher = this->launcher != nullptr;
+	this->launcher_lock.unlock();
+	if (!has_launcher) {
+		this->TryExit(false);
+	}
 }
 
 void Browser::Client::TryExit(bool check_launcher) {
 	bool launcher_open = check_launcher;
+	bool login_window_open = check_launcher;
 	if (check_launcher) {
 		this->launcher_lock.lock();
 		launcher_open = this->launcher != nullptr;
+		login_window_open = this->login_window != nullptr;
 		this->launcher_lock.unlock();
 	}
 
 #if defined(BOLT_PLUGINS)
 	this->game_clients_lock.lock();
-	size_t client_count = this->game_clients.size();
+	const size_t client_count = this->game_clients.size();
 	this->game_clients_lock.unlock();
 
-	bool can_exit = !launcher_open && (client_count == 0);
-	fmt::print("[B] TryExit, launcher={}, clients={}, exit={}\n", launcher_open, client_count, can_exit);
+	const bool can_exit = !launcher_open && !login_window_open && (client_count == 0);
+	fmt::print("[B] TryExit, launcher={}, login_window={}, clients={}, exit={}\n", launcher_open, login_window_open, client_count, can_exit);
 #else
-	bool can_exit = !launcher_open;
-	fmt::print("[B] TryExit, launcher={}, exit={}\n", launcher_open, can_exit);
+	const bool can_exit = !launcher_open && !login_window_open;
+	fmt::print("[B] TryExit, launcher={}, login_window={}, exit={}\n", launcher_open, login_window_open, can_exit);
 #endif
 	if (can_exit) {
 		this->Exit();
@@ -119,6 +158,39 @@ void Browser::Client::OnBoltWindowCreated(CefRefPtr<CefWindow> window) {
 	window->SetWindowAppIcon(image_big);
 }
 
+void Browser::Client::OnAuthError(CefString& error) {
+	fmt::print("[B] OnAuthError\n");
+	std::lock_guard<std::mutex> _(this->launcher_lock);
+	if (!this->launcher) return;
+	this->launcher->OnAuthError(error);
+}
+
+void Browser::Client::AddSession(const Session& session) {
+	std::lock_guard<std::mutex> _(this->sessions_lock);
+	bool assigned = false;
+	for (Session& s: this->sessions) {
+		if (s.sub == session.sub) {
+			// already logged in on this account - update it to the new session
+			s = session;
+			assigned = true;
+			break;
+		}
+	}
+	if (!assigned) {
+		// add a brand-new session
+		this->sessions.push_back(session);
+	}
+
+	// write to disk
+	this->WriteSessions();
+
+	if (this->launcher) {
+		// send new session list to render process
+		CefRefPtr<CefListValue> session_list = this->CreateSessionsList();
+		this->launcher->UpdateSessionList(session_list);
+	}
+}
+
 #if defined(BOLT_DEV_LAUNCHER_DIRECTORY)
 void Browser::Client::OnFileChange() {
 	this->launcher_lock.lock();
@@ -133,9 +205,17 @@ void Browser::Client::OnContextInitialized() {
 	fmt::print("[B] OnContextInitialized\n");
 	// After main() enters its event loop, this function will be called on the main thread when CEF
 	// context is ready to go, so, as suggested by CEF examples, Bolt treats this as an entry point.
-	this->launcher_lock.lock();
-	this->launcher = new Browser::Launcher(this, this->LauncherDetails(), this->show_devtools, this, this->config_dir, this->data_dir);
-	this->launcher_lock.unlock();
+	this->creds_path = this->data_dir;
+	this->creds_path.append("creds");
+	std::ifstream creds_file(this->creds_path.c_str(), std::ios::in | std::ios::binary);
+	if (!creds_file.fail()) {
+		std::stringstream ss;
+		ss << creds_file.rdbuf();
+		CefRefPtr<CefValue> json = CefParseJSON(ss.str(), JSON_PARSER_RFC);
+		if (json) this->TryAssignSessions(json);
+	}
+
+	this->OpenLauncher();
 }
 
 Browser::Details Browser::Client::LauncherDetails() {
@@ -174,6 +254,84 @@ Browser::Details Browser::Client::LauncherDetails() {
 		.is_devtools = false,
 		.has_custom_js = false,
 	};
+}
+
+void Browser::Client::TryAssignSessions(CefRefPtr<CefValue> json) {
+	CefRefPtr<CefListValue> list = json->GetList();
+	if (!list) return;
+	const size_t size = list->GetSize();
+	this->sessions_lock.lock();
+	this->sessions.reserve(size);
+	for (size_t i = 0; i < size; i += 1) {
+		CefRefPtr<CefDictionaryValue> dict = list->GetDictionary(i);
+		if (!dict) continue;
+		if (dict->GetType(L"session_id") != VTYPE_STRING) continue;
+		const CefString session_id = dict->GetString(L"session_id");
+		CefRefPtr<CefDictionaryValue> user_dict = dict->GetDictionary(L"user");
+		if (!user_dict || user_dict->GetType(L"displayName") != VTYPE_STRING || user_dict->GetType(L"suffix") != VTYPE_STRING) continue;
+		const CefString display_name = user_dict->GetString(L"displayName");
+		const CefString suffix = user_dict->GetString(L"suffix");
+		CefRefPtr<CefDictionaryValue> tokens_dict = dict->GetDictionary(L"tokens");
+		if (!tokens_dict || tokens_dict->GetType(L"sub") != VTYPE_STRING) continue;
+		const CefString sub = tokens_dict->GetString(L"sub");
+		this->sessions.push_back(Session {
+			.session_id = session_id,
+			.display_name = display_name,
+			.suffix = suffix,
+    		.sub = sub,
+			.is_new = false,
+		});
+	}
+	this->has_sessions = true;
+	this->sessions_lock.unlock();
+}
+
+CefRefPtr<CefListValue> Browser::Client::CreateSessionsList() {
+	CefRefPtr<CefListValue> session_list = CefListValue::Create();
+	session_list->SetSize(this->sessions.size());
+	size_t i = 0;
+	for (Session& session: this->sessions) {
+		CefRefPtr<CefDictionaryValue> dict = CefDictionaryValue::Create();
+		dict->SetString(L"displayName", session.display_name);
+		dict->SetString(L"suffix", session.suffix);
+		dict->SetString(L"sub", session.sub);
+		dict->SetString(L"sessionId", session.session_id);
+		dict->SetBool(L"isNew", session.is_new);
+		session_list->SetDictionary(i, dict);
+		session.is_new = false;
+		i += 1;
+	}
+	return session_list;
+}
+
+void Browser::Client::WriteSessions() {
+	CefRefPtr<CefListValue> list = CefListValue::Create();
+	list->SetSize(this->sessions.size());
+	size_t i = 0;
+	for (const Session& session: this->sessions) {
+		CefRefPtr<CefDictionaryValue> user_dict = CefDictionaryValue::Create();
+		user_dict->SetString(L"displayName", session.display_name);
+		user_dict->SetString(L"suffix", session.suffix);
+
+		CefRefPtr<CefDictionaryValue> tokens_dict = CefDictionaryValue::Create();
+		tokens_dict->SetString(L"sub", session.sub);
+		
+		CefRefPtr<CefDictionaryValue> dict = CefDictionaryValue::Create();
+		dict->SetDictionary(L"user", user_dict);
+		dict->SetDictionary(L"tokens", tokens_dict);
+		dict->SetString(L"session_id", session.session_id);
+		list->SetDictionary(i, dict);
+		i += 1;
+	}
+	CefRefPtr<CefValue> v = CefValue::Create();
+	v->SetList(list);
+	const std::string creds = CefWriteJSON(v, JSON_WRITER_OMIT_DOUBLE_TYPE_PRESERVATION).ToString();
+	std::ofstream file(this->creds_path, std::ios::out | std::ios::binary);
+	if (file.fail()) {
+		fmt::println("[B] failed to save credentials file");
+		return;
+	}
+	file.write(creds.c_str(), creds.size());
 }
 
 #if defined(BOLT_PLUGINS)

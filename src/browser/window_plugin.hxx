@@ -20,22 +20,6 @@ namespace Browser {
 		void SendCaptureDone() const override;
 		void HandleShowDevtools() override;
 
-		bool OnBeforePopup(
-			CefRefPtr<CefBrowser>,
-			CefRefPtr<CefFrame>,
-			int,
-			const CefString&,
-			const CefString&,
-			CefLifeSpanHandler::WindowOpenDisposition,
-			bool,
-			const CefPopupFeatures&,
-			CefWindowInfo&,
-			CefRefPtr<CefClient>&,
-			CefBrowserSettings&,
-			CefRefPtr<CefDictionaryValue>&,
-			bool*
-		) override;
-
 		bool OnProcessMessageReceived(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefProcessId, CefRefPtr<CefProcessMessage>) override;
 		void OnAfterCreated(CefRefPtr<CefBrowser>) override;
 

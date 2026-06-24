@@ -1,5 +1,3 @@
-import type { AuthTokens } from '$lib/Services/AuthService';
-
 export type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
 
 export function ok<T>(value: T): Result<T, never> {
@@ -32,6 +30,18 @@ export interface Direct6Token {
 	version?: string;
 	promoteTime?: number;
 	scanTime?: number;
+}
+
+export interface Session {
+	displayName: string;
+	suffix: string;
+	sessionId: string;
+	isNew: boolean; // will only ever be true in incoming data
+	characters: { [characterId: string]: Character };
+}
+
+export interface Character {
+	displayName: string;
 }
 
 // a specific instance of a currently-running rs3 plugin, associated with a GameClient
@@ -74,24 +84,9 @@ export interface PluginUpdaterConfig {
 	url?: string;
 }
 
-interface AuthTokenUpdateMessage {
-	type: 'authTokenUpdate';
-	tokens: AuthTokens;
-}
-
-interface AuthSessionUpdateMessage {
-	type: 'authSessionUpdate';
-	sessionId: string;
-}
-
-interface AuthFailedMessage {
-	type: 'authFailed';
-	reason: string;
-}
-
-interface ExternalUrlMessage {
-	type: 'externalUrl';
-	url: string;
+interface AuthErrorMessage {
+	type: 'authError';
+	error: string;
 }
 
 interface GameClientListMessage {
@@ -99,9 +94,9 @@ interface GameClientListMessage {
 	clients: GameClient[];
 }
 
-export type BoltMessage =
-	| AuthTokenUpdateMessage
-	| AuthSessionUpdateMessage
-	| AuthFailedMessage
-	| ExternalUrlMessage
-	| GameClientListMessage;
+interface SessionListMessage {
+	type: 'sessionList';
+	sessions: { [sub: string]: Session };
+}
+
+export type BoltMessage = AuthErrorMessage | GameClientListMessage | SessionListMessage;

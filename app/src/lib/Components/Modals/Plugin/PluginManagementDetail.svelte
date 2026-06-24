@@ -20,7 +20,7 @@
 		onUpdate,
 		setMessageInfo,
 		setMessageError,
-		updatePluginById,
+		updatePluginById
 	}: Props = $props();
 
 	const browseData = () => {
@@ -36,20 +36,25 @@
 	};
 
 	const updatePlugin = () => {
-		updatePluginById(pluginId, pluginMeta).then(didUpdate => {
-			if (didUpdate) {
-				setMessageInfo(`Plugin "${pluginMeta.name}" updated`);
-			} else {
-				setMessageInfo("Plugin already up-to-date");
-			}
-		}).catch(e => setMessageError(`Error updating: ${e}`)).finally(onUpdate);
+		updatePluginById(pluginId, pluginMeta)
+			.then((didUpdate) => {
+				if (didUpdate) {
+					setMessageInfo(`Plugin "${pluginMeta.name}" updated`);
+				} else {
+					setMessageInfo('Plugin already up-to-date');
+				}
+			})
+			.catch((e) => setMessageError(`Error updating: ${e}`))
+			.finally(onUpdate);
 	};
 
 	const removePlugin = async () => onRemove(pluginId);
 </script>
 
 {#if pluginConfig}
-	<div class="flex h-full flex-col items-center justify-center px-2 py-5 text-center overflow-y-auto">
+	<div
+		class="flex h-full flex-col items-center justify-center px-2 py-5 text-center overflow-y-auto"
+	>
 		<h2 class="pb-2 text-2xl font-bold">
 			{pluginConfig.name ?? '(unnamed)'}
 		</h2>

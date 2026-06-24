@@ -8,7 +8,7 @@
 
 namespace Browser {
 	struct Launcher: public Window, CefRequestHandler {
-		Launcher(CefRefPtr<Browser::Client>, Details, bool, CefRefPtr<FileManager::FileManager>, std::filesystem::path, std::filesystem::path);
+		Launcher(CefRefPtr<Browser::Client>, Details, bool, CefRefPtr<FileManager::FileManager>, std::filesystem::path, std::filesystem::path, CefRefPtr<CefListValue>);
 
 		CefRefPtr<CefRequestHandler> GetRequestHandler() override;
 		CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(
@@ -31,11 +31,16 @@ namespace Browser {
 		/// inserting their contents into the query params
 		CefString BuildURL() const;
 
+		void GetWindowPos(int* x, int* y) const;
+
 #if defined(BOLT_PLUGINS)
 		/// Gets a new game client list and sends it to the browser window via a postMessage.
 		/// bool indicates whether client's game_clients_lock is already locked
 		void UpdateClientList(bool need_lock_client_mutex) const;
 #endif
+
+		/// Sends a new session list to the browser window via a postMessage
+		void UpdateSessionList(CefRefPtr<CefListValue> list) const;
 
 		void NotifyClosed() override;
 
@@ -43,59 +48,13 @@ namespace Browser {
 
 		bool OnProcessMessageReceived(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefProcessId, CefRefPtr<CefProcessMessage>) override;
 
-		/*
-		Game launch functions implemented in os-specific files
-		*/
-
-		CefRefPtr<CefResourceRequestHandler> LaunchRs3Deb(CefRefPtr<CefRequest>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchRs3Exe(CefRefPtr<CefRequest>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchRs3App(CefRefPtr<CefRequest>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchOsrsExe(CefRefPtr<CefRequest>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchOsrsApp(CefRefPtr<CefRequest>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchHdosJar(CefRefPtr<CefRequest>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchRuneliteJar(CefRefPtr<CefRequest>, std::string_view, bool configure);
-
-		/* 
-		Functions called by GetResourceRequestHandler. The result will be returned immediately and must not be null.
-		The request and URL query string are provided for parsing.
-		*/
-
-		CefRefPtr<CefResourceRequestHandler> LaunchRs3Deb(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchRs3Exe(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchRs3App(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchOsrsExe(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchOsrsApp(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchHdosJar(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchRuneliteJarNormal(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> LaunchRuneliteJarConfigure(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> SaveConfig(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> SaveCredentials(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> OpenExternalUrl(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> BrowseDirectory(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> BrowseData(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> JarFilePicker(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> JsonFilePicker(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> Close(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-
-#if defined(BOLT_PLUGINS)
-		CefRefPtr<CefResourceRequestHandler> SavePluginConfig(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> ListGameClients(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> ReadJsonFile(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> StartPlugin(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> StopPlugin(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> InstallPlugin(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> UninstallPlugin(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> GetPluginDirJson(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> BrowsePluginData(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-		CefRefPtr<CefResourceRequestHandler> BrowsePluginConfig(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
-#endif
+		void OnAuthError(CefString&);
 
 		private:
 			int last_x;
 			int last_y;
 			CefRefPtr<FileManager::FileManager> file_manager;
 			std::filesystem::path data_dir;
-			std::filesystem::path creds_path;
 			std::filesystem::path config_path;
 			std::filesystem::path launcher_bin_path;
 			std::filesystem::path rs3_elf_path;
@@ -116,6 +75,55 @@ namespace Browser {
 			std::filesystem::path plugin_config_path;
 			std::filesystem::path plugins_data_dir;
 			std::filesystem::path plugins_config_dir;
+#endif
+
+		/*
+		Game launch functions implemented in os-specific files
+		*/
+
+		CefRefPtr<CefResourceRequestHandler> LaunchRs3Deb(CefRefPtr<CefRequest>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchRs3Exe(CefRefPtr<CefRequest>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchRs3App(CefRefPtr<CefRequest>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchOsrsExe(CefRefPtr<CefRequest>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchOsrsApp(CefRefPtr<CefRequest>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchHdosJar(CefRefPtr<CefRequest>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchRuneliteJar(CefRefPtr<CefRequest>, std::string_view, bool configure);
+
+		/* 
+		Functions called by GetResourceRequestHandler. The result will be returned immediately and must not be null.
+		The request and URL query string are provided for parsing.
+		*/
+
+		CefRefPtr<CefResourceRequestHandler> OpenLoginWindow(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LookupCharacters(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> GetSessions(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchRs3Deb(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchRs3Exe(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchRs3App(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchOsrsExe(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchOsrsApp(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchHdosJar(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchRuneliteJarNormal(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> LaunchRuneliteJarConfigure(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> SaveConfig(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> OpenExternalUrl(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> BrowseDirectory(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> BrowseData(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> JarFilePicker(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> JsonFilePicker(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> Close(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+
+#if defined(BOLT_PLUGINS)
+		CefRefPtr<CefResourceRequestHandler> SavePluginConfig(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> ListGameClients(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> ReadJsonFile(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> StartPlugin(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> StopPlugin(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> InstallPlugin(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> UninstallPlugin(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> GetPluginDirJson(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> BrowsePluginData(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> BrowsePluginConfig(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 #endif
 	};
 }

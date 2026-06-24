@@ -1,4 +1,5 @@
 #include "app.hxx"
+#include "fmt/base.h"
 #include "include/cef_process_message.h"
 #include "include/cef_v8.h"
 #include "include/cef_values.h"
@@ -30,6 +31,36 @@ static bool shm_inited = false;
 static bool set_launcher_ui = false;
 static bool has_custom_js = false;
 static CefString custom_js;
+
+struct Session {
+	CefString display_name;
+	CefString suffix;
+	CefString session_id;
+	CefString sub;
+	bool is_new;
+};
+static std::vector<Session> sessions;
+static bool has_sessions = false;
+
+#if defined(BOLT_PLUGINS)
+struct PluginMeta {
+	CefString id;
+	CefString name;
+	CefString version;
+	CefString updaterURL;
+	CefString sha256;
+	CefString originalName;
+	CefString path;
+	bool has_path;
+};
+struct PluginAutostartList {
+	CefString character_id;
+	std::vector<CefString> plugin_ids;
+};
+static std::vector<PluginMeta> plugins;
+static std::vector<PluginAutostartList> autostart;
+static bool has_plugins = false;
+#endif
 
 // assumes the context has already been entered
 void PostPluginMessage(CefRefPtr<CefV8Context> context, CefRefPtr<CefProcessMessage> message) {
@@ -80,23 +111,126 @@ CefRefPtr<CefLoadHandler> Browser::App::GetLoadHandler() {
 
 void Browser::App::OnBrowserCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefDictionaryValue> dict) {
 	if (dict) {
-		if (dict->HasKey("launcher")) set_launcher_ui = dict->GetBool("launcher");
-		if (dict->HasKey("customjs")) {
-			custom_js = dict->GetString("customjs");
+		if (dict->HasKey(L"launcher")) set_launcher_ui = dict->GetBool(L"launcher");
+		if (dict->GetType(L"customjs") == VTYPE_STRING) {
+			custom_js = dict->GetString(L"customjs");
 			has_custom_js = true;
 		}
+		if (dict->GetType(L"sessions") == VTYPE_LIST) {
+			has_sessions = true;
+			CefRefPtr<CefListValue> session_list = dict->GetList(L"sessions");
+			const size_t session_count = session_list->GetSize();
+			sessions.reserve(session_count);
+			for (size_t i = 0; i < session_count; i += 1) {
+				CefRefPtr<CefDictionaryValue> session = session_list->GetDictionary(i);
+				sessions.push_back(Session {
+					.display_name = session->GetString(L"displayName"),
+					.suffix = session->GetString(L"suffix"),
+					.session_id = session->GetString(L"sessionId"),
+					.sub = session->GetString(L"sub"),
+					.is_new = session->GetBool(L"isNew"),
+				});
+			}
+		}
+#if defined(BOLT_PLUGINS)
+		if (dict->GetType(L"plugins") == VTYPE_DICTIONARY) {
+			has_plugins = true;
+			CefRefPtr<CefDictionaryValue> plugins_dict = dict->GetDictionary(L"plugins");
+			plugins.reserve(plugins_dict->GetSize());
+			CefDictionaryValue::KeyList keys;
+			plugins_dict->GetKeys(keys);
+			for (const CefString& plugin_id: keys) {
+				CefRefPtr<CefDictionaryValue> plugin_dict = plugins_dict->GetDictionary(plugin_id);
+				if (plugin_id == L"autostart") {
+					autostart.reserve(plugin_dict->GetSize());
+					CefDictionaryValue::KeyList autostart_keys;
+					plugin_dict->GetKeys(autostart_keys);
+					for (const CefString& character_id: autostart_keys) {
+						CefRefPtr<CefListValue> list = plugin_dict->GetList(character_id);
+						const size_t size = list->GetSize();
+						std::vector<CefString> array;
+						array.reserve(size);
+						for (size_t i = 0; i < size; i += 1) {
+							array.push_back(list->GetString(i));
+						}
+						autostart.push_back(PluginAutostartList {
+							.character_id = character_id,
+							.plugin_ids = array,
+						});
+					}
+					continue;
+				}
+				CefRefPtr<CefDictionaryValue> plugin = plugins_dict->GetDictionary(plugin_id);
+				plugins.push_back(PluginMeta {
+					.id = plugin_id,
+					.name = plugin->GetString(L"name"),
+					.version = plugin->GetString(L"version"),
+					.updaterURL = plugin->GetString(L"updaterURL"),
+					.sha256 = plugin->GetString(L"sha256"),
+					.originalName = plugin->GetString(L"originalName"),
+					.path = plugin->GetString(L"path"),
+					.has_path = plugin->GetType(L"path") == VTYPE_STRING,
+				});
+			}
+		}
+#endif
 	}
 }
 
 void Browser::App::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) {
 	const CefRefPtr<CefV8Value> global = context->GetGlobal();
-	global->SetValue("close", CefV8Value::CreateUndefined(), V8_PROPERTY_ATTRIBUTE_READONLY);
 	if (set_launcher_ui) {
-		global->SetValue("s", CefV8Value::CreateFunction("s", this), V8_PROPERTY_ATTRIBUTE_READONLY);
+		const CefString s(L"s");
+		global->SetValue(s, CefV8Value::CreateFunction(s, this), V8_PROPERTY_ATTRIBUTE_READONLY);
 	}
 	if (has_custom_js) {
 		frame->ExecuteJavaScript(custom_js, CefString(), int());
 	}
+	if (has_sessions) {
+		CefRefPtr<CefV8Value> dict = CefV8Value::CreateObject(nullptr, nullptr);
+		const size_t session_count = sessions.size();
+		for (const Session& session: sessions) {
+			CefRefPtr<CefV8Value> session_v8 = CefV8Value::CreateObject(nullptr, nullptr);
+			session_v8->SetValue(L"displayName", CefV8Value::CreateString(session.display_name), V8_PROPERTY_ATTRIBUTE_READONLY);
+			session_v8->SetValue(L"suffix", CefV8Value::CreateString(session.suffix), V8_PROPERTY_ATTRIBUTE_READONLY);
+			session_v8->SetValue(L"sessionId", CefV8Value::CreateString(session.session_id), V8_PROPERTY_ATTRIBUTE_READONLY);
+			session_v8->SetValue(L"isNew", CefV8Value::CreateBool(session.is_new), V8_PROPERTY_ATTRIBUTE_NONE);
+			session_v8->SetValue(L"characters", CefV8Value::CreateObject(nullptr, nullptr), V8_PROPERTY_ATTRIBUTE_NONE);
+			dict->SetValue(session.sub, session_v8, V8_PROPERTY_ATTRIBUTE_READONLY);
+		}
+		global->SetValue(L"sessions", dict, V8_PROPERTY_ATTRIBUTE_NONE);
+		sessions.clear();
+	}
+#if defined(BOLT_PLUGINS)
+	if (has_plugins) {
+		CefRefPtr<CefV8Value> dict = CefV8Value::CreateObject(nullptr, nullptr);
+		for (const PluginMeta& plugin_iter: plugins) {
+			CefRefPtr<CefV8Value> plugin_v8 = CefV8Value::CreateObject(nullptr, nullptr);
+			plugin_v8->SetValue(L"name", CefV8Value::CreateString(plugin_iter.name), V8_PROPERTY_ATTRIBUTE_READONLY);
+			plugin_v8->SetValue(L"version", CefV8Value::CreateString(plugin_iter.version), V8_PROPERTY_ATTRIBUTE_READONLY);
+			plugin_v8->SetValue(L"updaterURL", CefV8Value::CreateString(plugin_iter.updaterURL), V8_PROPERTY_ATTRIBUTE_READONLY);
+			plugin_v8->SetValue(L"sha256", CefV8Value::CreateString(plugin_iter.sha256), V8_PROPERTY_ATTRIBUTE_READONLY);
+			plugin_v8->SetValue(L"originalName", CefV8Value::CreateString(plugin_iter.originalName), V8_PROPERTY_ATTRIBUTE_READONLY);
+			if (plugin_iter.has_path) {
+				plugin_v8->SetValue(L"path", CefV8Value::CreateString(plugin_iter.path), V8_PROPERTY_ATTRIBUTE_READONLY);
+			}
+			dict->SetValue(plugin_iter.id, plugin_v8, V8_PROPERTY_ATTRIBUTE_READONLY);
+		}
+		global->SetValue(L"plugins", dict, V8_PROPERTY_ATTRIBUTE_NONE);
+
+		CefRefPtr<CefV8Value> autostart_v8 = CefV8Value::CreateObject(nullptr, nullptr);
+		for (const PluginAutostartList& autostart_iter: autostart) {
+			CefRefPtr<CefV8Value> array = CefV8Value::CreateArray(autostart_iter.plugin_ids.size());
+			int i = 0;
+			for (const CefString& plugin_id: autostart_iter.plugin_ids) {
+				array->SetValue(i, CefV8Value::CreateString(plugin_id));
+				i += 1;
+			}
+			autostart_v8->SetValue(autostart_iter.character_id, array, V8_PROPERTY_ATTRIBUTE_READONLY);
+		}
+		global->SetValue(L"autostart", autostart_v8, V8_PROPERTY_ATTRIBUTE_NONE);
+	}
+#endif
 }
 
 void Browser::App::OnUncaughtException(
@@ -176,6 +310,36 @@ bool Browser::App::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRe
 			CefRefPtr<CefV8Value> dict = CefV8Value::CreateObject(nullptr, nullptr);
 			dict->SetValue("type", CefV8Value::CreateString("gameClientList"), V8_PROPERTY_ATTRIBUTE_READONLY);
 			dict->SetValue("clients", clients, V8_PROPERTY_ATTRIBUTE_READONLY);
+			CefV8ValueList value_list = {dict, CefV8Value::CreateString("*")};
+			post_message->ExecuteFunctionWithContext(context, nullptr, value_list);
+		}
+		context->Exit();
+		return true;
+	}
+
+	if (name == "__bolt_sessionlist") {
+		CefRefPtr<CefV8Context> context = frame->GetV8Context();
+		context->Enter();
+		CefRefPtr<CefV8Value> post_message = context->GetGlobal()->GetValue("postMessage");
+		if (post_message->IsFunction()) {
+			CefRefPtr<CefListValue> argument_list = message->GetArgumentList();
+			CefRefPtr<CefListValue> list = argument_list->GetList(0);
+			CefRefPtr<CefV8Value> sessions_v8 = CefV8Value::CreateObject(nullptr, nullptr);
+			for (size_t i = 0; i < list->GetSize(); i += 1) {
+				CefRefPtr<CefDictionaryValue> session = list->GetDictionary(i);
+				CefRefPtr<CefV8Value> session_v8 = CefV8Value::CreateObject(nullptr, nullptr);
+				session_v8->SetValue(L"displayName", CefV8Value::CreateString(session->GetString(L"displayName")), V8_PROPERTY_ATTRIBUTE_READONLY);
+				session_v8->SetValue(L"suffix", CefV8Value::CreateString(session->GetString(L"suffix")), V8_PROPERTY_ATTRIBUTE_READONLY);
+				session_v8->SetValue(L"sessionId", CefV8Value::CreateString(session->GetString(L"sessionId")), V8_PROPERTY_ATTRIBUTE_READONLY);
+				session_v8->SetValue(L"isNew", CefV8Value::CreateBool(session->GetBool(L"isNew")), V8_PROPERTY_ATTRIBUTE_NONE);
+				session_v8->SetValue(L"characters", CefV8Value::CreateObject(nullptr, nullptr), V8_PROPERTY_ATTRIBUTE_NONE);
+				sessions_v8->SetValue(session->GetString(L"sub"), session_v8, V8_PROPERTY_ATTRIBUTE_READONLY);
+			}
+
+			// equivalent to: `window.postMessage({type: 'sessionList', clients: [ ... ]}, '*')`
+			CefRefPtr<CefV8Value> dict = CefV8Value::CreateObject(nullptr, nullptr);
+			dict->SetValue(L"type", CefV8Value::CreateString(L"sessionList"), V8_PROPERTY_ATTRIBUTE_READONLY);
+			dict->SetValue(L"sessions", sessions_v8, V8_PROPERTY_ATTRIBUTE_READONLY);
 			CefV8ValueList value_list = {dict, CefV8Value::CreateString("*")};
 			post_message->ExecuteFunctionWithContext(context, nullptr, value_list);
 		}
@@ -263,6 +427,25 @@ bool Browser::App::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRe
 		return true;
 	}
 
+	if (name == "__bolt_auth_error") {
+		CefRefPtr<CefV8Context> context = frame->GetV8Context();
+		context->Enter();
+		CefRefPtr<CefV8Value> post_message = context->GetGlobal()->GetValue("postMessage");
+		if (post_message->IsFunction()) {
+			CefRefPtr<CefListValue> list = message->GetArgumentList();
+			const CefString error = list->GetString(0);
+
+			// equivalent to: `window.postMessage({type: 'authError', clients: [ ... ]}, '*')`
+			CefRefPtr<CefV8Value> dict = CefV8Value::CreateObject(nullptr, nullptr);
+			dict->SetValue("type", CefV8Value::CreateString("authError"), V8_PROPERTY_ATTRIBUTE_READONLY);
+			dict->SetValue("error", CefV8Value::CreateString(error), V8_PROPERTY_ATTRIBUTE_READONLY);
+			CefV8ValueList value_list = {dict, CefV8Value::CreateString("*")};
+			post_message->ExecuteFunctionWithContext(context, nullptr, value_list);
+		}
+		context->Exit();
+		return true;
+	}
+
 	return false;
 }
 
@@ -289,24 +472,23 @@ void Browser::App::OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame
 
 bool Browser::App::Execute(const CefString&, CefRefPtr<CefV8Value>, const CefV8ValueList&, CefRefPtr<CefV8Value>& retval, CefString&) {
 	retval = CefV8Value::CreateObject(nullptr, nullptr);
-	retval->SetValue("provider", CefV8Value::CreateString("cnVuZXNjYXBl"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("origin", CefV8Value::CreateString("aHR0cHM6Ly9hY2NvdW50LmphZ2V4LmNvbQ"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("origin_2fa", CefV8Value::CreateString("aHR0cHM6Ly9zZWN1cmUucnVuZXNjYXBlLmNvbQ"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("redirect", CefV8Value::CreateString("aHR0cHM6Ly9zZWN1cmUucnVuZXNjYXBlLmNvbS9tPXdlYmxvZ2luL2xhdW5jaGVyLXJlZGlyZWN0"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("clientid", CefV8Value::CreateString("Y29tX2phZ2V4X2F1dGhfZGVza3RvcF9sYXVuY2hlcg"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("api", CefV8Value::CreateString("aHR0cHM6Ly9hcGkuamFnZXguY29tL3Yx"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("auth_api", CefV8Value::CreateString("aHR0cHM6Ly9hdXRoLmphZ2V4LmNvbS9nYW1lLXNlc3Npb24vdjE"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("profile_api", CefV8Value::CreateString("aHR0cHM6Ly9zZWN1cmUuamFnZXguY29tL3JzLXByb2ZpbGUvdjE"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("shield_url", CefV8Value::CreateString("aHR0cHM6Ly9hdXRoLmphZ2V4LmNvbS9zaGllbGQvb2F1dGgvdG9rZW4"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("content_url", CefV8Value::CreateString("aHR0cHM6Ly9jb250ZW50LnJ1bmVzY2FwZS5jb20vZG93bmxvYWRzL3VidW50dS8"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("default_config_uri", CefV8Value::CreateString("aHR0cHM6Ly93d3cucnVuZXNjYXBlLmNvbS9rPTUvbD0wL2phdl9jb25maWcud3M"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("direct6_url", CefV8Value::CreateString("aHR0cHM6Ly9qYWdleC5ha2FtYWl6ZWQubmV0L2RpcmVjdDYv"), V8_PROPERTY_ATTRIBUTE_READONLY);
-	retval->SetValue("psa_url", CefV8Value::CreateString("aHR0cHM6Ly9maWxlcy5wdWJsaXNoaW5nLnByb2R1Y3Rpb24uanhwLmphZ2V4LmNvbS8"), V8_PROPERTY_ATTRIBUTE_READONLY);
+	retval->SetValue(L"provider", CefV8Value::CreateString(L"cnVuZXNjYXBl"), V8_PROPERTY_ATTRIBUTE_READONLY);
+	retval->SetValue(L"api", CefV8Value::CreateString(L"aHR0cHM6Ly9hcGkuamFnZXguY29tL3Yx"), V8_PROPERTY_ATTRIBUTE_READONLY);
+	retval->SetValue(L"profile_api", CefV8Value::CreateString(L"aHR0cHM6Ly9zZWN1cmUuamFnZXguY29tL3JzLXByb2ZpbGUvdjE="), V8_PROPERTY_ATTRIBUTE_READONLY);
+	retval->SetValue(L"content_url", CefV8Value::CreateString(L"aHR0cHM6Ly9jb250ZW50LnJ1bmVzY2FwZS5jb20vZG93bmxvYWRzL3VidW50dS8="), V8_PROPERTY_ATTRIBUTE_READONLY);
+	retval->SetValue(L"default_config_uri", CefV8Value::CreateString(L"aHR0cHM6Ly93d3cucnVuZXNjYXBlLmNvbS9rPTUvbD0wL2phdl9jb25maWcud3M="), V8_PROPERTY_ATTRIBUTE_READONLY);
+	retval->SetValue(L"direct6_url", CefV8Value::CreateString(L"aHR0cHM6Ly9qYWdleC5ha2FtYWl6ZWQubmV0L2RpcmVjdDYv"), V8_PROPERTY_ATTRIBUTE_READONLY);
+	retval->SetValue(L"psa_url", CefV8Value::CreateString(L"aHR0cHM6Ly9maWxlcy5wdWJsaXNoaW5nLnByb2R1Y3Rpb24uanhwLmphZ2V4LmNvbS8="), V8_PROPERTY_ATTRIBUTE_READONLY);
 
 	CefRefPtr<CefV8Value> games = CefV8Value::CreateArray(2);
-	games->SetValue(0, CefV8Value::CreateString("UnVuZVNjYXBl"));
-	games->SetValue(1, CefV8Value::CreateString("T2xkIFNjaG9vbA"));
-	retval->SetValue("games", games, V8_PROPERTY_ATTRIBUTE_READONLY);
+	games->SetValue(0, CefV8Value::CreateString(L"UnVuZVNjYXBl"));
+	games->SetValue(1, CefV8Value::CreateString(L"T2xkIFNjaG9vbA=="));
+	retval->SetValue(L"games", games, V8_PROPERTY_ATTRIBUTE_READONLY);
+
+	CefRefPtr<CefV8Value> disclaimer = CefV8Value::CreateArray(2);
+	disclaimer->SetValue(0, CefV8Value::CreateString(L"Qm9sdCBpcyBhbiB1bm9mZmljaWFsIHRoaXJkLXBhcnR5IGxhdW5jaGVyLiBJdCdzIGZyZWUgYW5kIG9wZW4tc291cmNlIHNvZnR3YXJlIGxpY2Vuc2VkIHVuZGVyIEFHUEwgMy4wLg=="));
+	disclaimer->SetValue(1, CefV8Value::CreateString(L"SmFnZXggaXMgbm90IHJlc3BvbnNpYmxlIGZvciBhbnkgcHJvYmxlbXMgb3IgZGFtYWdlIGNhdXNlZCBieSB1c2luZyB0aGlzIHByb2R1Y3Qu"));
+	retval->SetValue(L"disclaimer", disclaimer, V8_PROPERTY_ATTRIBUTE_READONLY);
 	return true;
 }
 

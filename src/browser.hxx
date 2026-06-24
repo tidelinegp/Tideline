@@ -39,9 +39,6 @@ namespace Browser {
 		/// Force-closes this browser and all of its children
 		virtual void Close();
 
-		/// Closes all of this window's child windows except its devtools window, if open.
-		void CloseChildrenExceptDevtools();
-
 		/// Opens devtools for this browser
 		void ShowDevTools();
 
@@ -103,8 +100,7 @@ namespace Browser {
 			CefRefPtr<CefWindow> window;
 			CefRefPtr<CefBrowserView> browser_view;
 			CefRefPtr<CefBrowser> browser;
-			CefRefPtr<Window> pending_child;
-			std::vector<CefRefPtr<Window>> children;
+			CefRefPtr<Window> devtools;
 			CefPopupFeatures popup_features;
 
 			IMPLEMENT_REFCOUNTING(Window);

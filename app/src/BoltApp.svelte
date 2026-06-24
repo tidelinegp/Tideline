@@ -12,7 +12,7 @@
 	const logs = logger.logs;
 	let osrsPsa: string | null = null;
 	let rs3Psa: string | null = null;
-	const { config } = GlobalState;
+	const { config, isNew } = GlobalState;
 
 	const mainClass = 'mt-16 grid h-full grid-flow-col grid-cols-2 sm:grid-cols-3';
 	const mainClassNoNews = 'mt-16 grid h-full grid-flow-col grid-cols-3';
@@ -21,7 +21,9 @@
 </script>
 
 <MainLayout>
-	<DisclaimerModal />
+	{#if isNew}
+		<DisclaimerModal />
+	{/if}
 	<TopBar />
 	<div class={$config.fetch_rss_feeds ? mainClass : mainClassNoNews}>
 		{#if $config.fetch_rss_feeds}

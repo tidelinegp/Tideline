@@ -2,6 +2,11 @@ import { GlobalState } from '$lib/State/GlobalState';
 import { Client, Game } from '$lib/Util/Interfaces';
 import { logger } from '$lib/Util/Logger';
 import { onWritableChange } from '$lib/Util/OnWritableChange';
+import { bolt } from '$lib/State/Bolt';
+import { get } from 'svelte/store';
+
+let saveInProgress: boolean = false;
+let savePluginInProgress: boolean = false;
 
 type UserDetails = {
 	account_id: string;
@@ -57,8 +62,7 @@ export const defaultConfig: Config = {
 	userDetails: {}
 };
 
-export function initConfig() {
-	const params = new URLSearchParams(window.location.search);
+export function initConfig(params: URLSearchParams) {
 	const configParam = params.get('config');
 
 	function isConfigValid(conf: Config): conf is Config {
@@ -118,5 +122,51 @@ export function initConfig() {
 
 	onWritableChange(GlobalState.config, () => {
 		GlobalState.configHasPendingChanges = true;
+	});
+}
+
+// sends an asynchronous request to save the current user config to disk, if it has changed
+export function saveConfig(checkForPendingChanges = true) {
+	if (saveInProgress) return;
+	if (checkForPendingChanges && !GlobalState.configHasPendingChanges) return;
+	saveInProgress = true;
+	const config = get(GlobalState.config);
+	if (config.rs_launch_command === '') config.rs_launch_command = null;
+	if (config.osrs_launch_command === '') config.osrs_launch_command = null;
+	if (config.runelite_launch_command === '') config.runelite_launch_command = null;
+	if (config.hdos_launch_command === '') config.hdos_launch_command = null;
+	postJSON('/save-config', config, () => (saveInProgress = false));
+	return config;
+}
+
+// sends an asynchronous POST request containing some JSON and calls the callback with a fetch
+// response object
+const postJSON = async (
+	api: string,
+	object: object,
+	callback: ((r: Response) => void) | null = null
+): Promise<void> => {
+	const body: string = JSON.stringify(object);
+	const headers = { 'Content-Type': 'application/json' };
+	const response = await fetch(api, { method: 'POST', body, headers });
+	if (!response.ok)
+		response.text().then((text) => logger.error(`${api} error: ${response.status}: ${text}`));
+	if (callback) callback(response);
+};
+
+// sends an asynchronous request to save the current plugin config to disk, if it has changed
+export function savePluginConfig(checkForPendingChanges = true) {
+	// doesn't really have anything to do with the rest of this file, since this file is for the
+	// regular config and this function is for the plugin config. but I needed somewhere to put it,
+	// so I put it here because it has "config" in the name and uses postJSON from here.
+	if (savePluginInProgress) return;
+	if (checkForPendingChanges && !GlobalState.pluginConfigHasPendingChanges) return;
+	savePluginInProgress = true;
+
+	const configToSave = { ...bolt.pluginConfig, autostart: bolt.autostart };
+
+	postJSON('/save-plugin-config', configToSave, () => {
+		savePluginInProgress = false;
+		GlobalState.pluginConfigHasPendingChanges = false;
 	});
 }

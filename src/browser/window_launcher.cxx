@@ -1,5 +1,7 @@
 #include "client.hxx"
 #include "window_launcher.hxx"
+#include "include/cef_parser.h"
+#include "include/cef_resource_request_handler.h"
 #include "include/cef_values.h"
 #include "include/internal/cef_types.h"
 #include "resource_handler.hxx"
@@ -20,6 +22,8 @@
 #define BOLTURI "https://" BOLTDOMAIN
 #define DEFAULTURL BOLTURI "/index.html"
 
+#define ENDPOINT_ACCOUNTS "/game-session/v1/accounts"
+
 #if defined(__linux__)
 #define URLPLATFORM "linux"
 #endif
@@ -31,6 +35,15 @@
 #if defined(__APPLE__)
 #define URLPLATFORM "mac"
 #endif
+
+struct OpenLoginWindowTask: public CefTask {
+	OpenLoginWindowTask(CefRefPtr<Browser::Client> client): client(client) {}
+	void Execute() override { client->OpenLoginWindow(); }
+	private:
+		CefRefPtr<Browser::Client> client;
+		IMPLEMENT_REFCOUNTING(OpenLoginWindowTask);
+		DISALLOW_COPY_AND_ASSIGN(OpenLoginWindowTask);
+};
 
 struct FilePicker: public CefRunFileDialogCallback, Browser::ResourceHandler {
 	FilePicker(CefRefPtr<CefBrowser> browser, std::vector<CefString> accept_filters):
@@ -75,8 +88,9 @@ struct FilePicker: public CefRunFileDialogCallback, Browser::ResourceHandler {
 		CefRefPtr<CefCallback> callback;
 		std::string data_;
 		CefRefPtr<CefBrowserHost> browser_host;
-		IMPLEMENT_REFCOUNTING(FilePicker);
-		DISALLOW_COPY_AND_ASSIGN(FilePicker);
+		
+	IMPLEMENT_REFCOUNTING(FilePicker);
+	DISALLOW_COPY_AND_ASSIGN(FilePicker);
 };
 
 Browser::Launcher::Launcher(
@@ -85,11 +99,9 @@ Browser::Launcher::Launcher(
 	bool show_devtools,
 	CefRefPtr<FileManager::FileManager> file_manager,
 	std::filesystem::path config_dir,
-	std::filesystem::path data_dir
+	std::filesystem::path data_dir,
+	CefRefPtr<CefListValue> session_list
 ): Window(client, details, show_devtools), last_x(details.startx), last_y(details.starty), data_dir(data_dir), file_manager(file_manager) {
-	this->creds_path = data_dir;
-	this->creds_path.append("creds");
-
 	this->config_path = config_dir;
 	this->config_path.append("launcher.json");
 
@@ -151,6 +163,22 @@ Browser::Launcher::Launcher(
 
 	CefRefPtr<CefDictionaryValue> dict = CefDictionaryValue::Create();
 	dict->SetBool("launcher", true);
+	if (session_list) {
+		dict->SetList(L"sessions", session_list);
+	}
+#if defined(BOLT_PLUGINS)
+	std::ifstream plugin_file(this->plugin_config_path.c_str(), std::ios::in | std::ios::binary);
+	if (!plugin_file.fail()) {
+		std::stringstream ss;
+		ss << plugin_file.rdbuf();
+		CefRefPtr<CefValue> json = CefParseJSON(ss.str(), JSON_PARSER_RFC);
+		CefRefPtr<CefDictionaryValue> plugins_dict = json->GetDictionary();
+		if (plugins_dict) {
+			dict->SetDictionary(L"plugins", plugins_dict);
+		}
+		plugin_file.close();
+	}
+#endif
 	this->Init(this->BuildURL(), dict);
 }
 
@@ -182,17 +210,6 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 	const CefString& request_initiator,
 	bool& disable_default_handling
 ) {
-	// Some of the dreaded phrases that I don't want to show up in a grep/search
-	constexpr char provider[] = {106, 97, 103, 101, 120, 0};
-	constexpr char launcher_redirect_domain[] = {
-		115, 101, 99, 117, 114, 101, 46, 114, 117, 110, 101, 115, 99, 97, 112, 101,
-		46, 99, 111, 109, 0
-	};
-	constexpr char launcher_redirect_path[] = {
-		47, 109, 61, 119, 101, 98, 108, 111, 103, 105, 110, 47, 108, 97, 117, 110,
-		99, 104, 101, 114, 45, 114, 101, 100, 105, 114, 101, 99, 116, 0
-	};
-
 	// Parse URL
 	const std::string request_url = request->GetURL().ToString();
 	const std::string::size_type colon = request_url.find_first_of(':');
@@ -200,25 +217,8 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 		return nullptr;
 	}
 	const std::string_view schema(request_url.begin(), request_url.begin() + colon);
-	if (schema == provider) {
-		// parser for custom schema thing
-		const std::string_view query(request_url.begin() + colon + 1, request_url.end());
-		bool has_code = false;
-		CefString code;
-		bool has_state = false;
-		CefString state;
-		ParseQuery(query, [&](const std::string_view& key, const std::string_view& val) {
-			PQCEFSTRING(code)
-			PQCEFSTRING(state)
-		}, ',');
-		if (has_code && has_state) {
-			disable_default_handling = true;
-			QSENDMOVED(CefString(std::string(DEFAULTURL "?code=") + code.ToString() + "&state=" + state.ToString()));
-		} else {
-			return nullptr;
-		}
-	}
 
+	// if the request URL doesn't start with `http(s)://`, don't try to process it any further
 	if ((schema != "http" && schema != "https") || request_url.size() < colon + 4
 		|| request_url.at(colon + 1) != '/' || request_url.at(colon + 2) != '/')
 	{
@@ -236,18 +236,6 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 	const std::string_view query(request_url.begin() + next_question + 1, next_question == std::string::npos ? request_url.begin() + next_question + 1 : url_end);
 	const std::string_view comment(next_hash == std::string::npos ? request_url.end() : request_url.begin() + next_hash + 1, request_url.end());
 
-	// handler for launcher-redirect url
-	if (domain == launcher_redirect_domain && path == launcher_redirect_path) {
-		disable_default_handling = true;
-		QSENDMOVED(CefString(std::string(DEFAULTURL "?") + std::string(query)));
-	}
-
-	// handler for another custom request thing, but this one uses localhost, for whatever reason
-	if (domain == "localhost" && path == "/" && comment.starts_with("code=")) {
-		disable_default_handling = true;
-		QSENDMOVED(CefString(std::string(DEFAULTURL "?") + std::string(comment)));
-	}
-
 	const bool is_internal_target = domain == BOLTDOMAIN;
 	const bool is_internal_initiator = request_initiator == BOLTURI;
 
@@ -257,6 +245,8 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 
 	// internal API endpoints - only allowed if it's a request from internal URL to internal URL
 	if (is_internal_target && is_internal_initiator) {
+		ROUTE("login", OpenLoginWindow)
+		ROUTE("characters", LookupCharacters)
 		ROUTE("launch-rs3-deb", LaunchRs3Deb)
 		ROUTE("launch-rs3-exe", LaunchRs3Exe)
 		ROUTE("launch-rs3-app", LaunchRs3App)
@@ -266,7 +256,6 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 		ROUTE("launch-runelite-jar-configure", LaunchRuneliteJarConfigure)
 		ROUTE("launch-hdos-jar", LaunchHdosJar)
 		ROUTE("save-config", SaveConfig)
-		ROUTE("save-credentials", SaveCredentials)
 		ROUTE("open-external-url", OpenExternalUrl)
 		ROUTE("browse-directory", BrowseDirectory)
 		ROUTE("browse-data", BrowseData)
@@ -306,9 +295,8 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 	CefRefPtr<CefRequest> new_request = CefRequest::Create();
 	CefRequest::HeaderMap headers;
 	request->GetHeaderMap(headers); // doesn't include Referer header
-	headers.erase("Origin");
 	new_request->Set(request->GetURL(), request->GetMethod(), request->GetPostData(), headers);
-	return new DefaultURLHandler(new_request);
+	return new URLHandlerNoCORS(new_request, this->browser->GetHost()->GetRequestContext());
 }
 
 void Browser::Launcher::OnBrowserDestroyed(CefRefPtr<CefBrowserView> view, CefRefPtr<CefBrowser> browser) {
@@ -371,16 +359,6 @@ CefString Browser::Launcher::BuildURL() const {
 		url << "&hdos_installed_version=" << hdos_hashfile.rdbuf();
 	}
 
-	std::ifstream creds_file(this->creds_path.c_str(), std::ios::in | std::ios::binary);
-	std::string creds_str;
-	if (!creds_file.fail()) {
-		std::stringstream ss;
-		ss << creds_file.rdbuf();
-		creds_str = CefURIEncode(CefString(ss.str()), true).ToString();
-		url << "&credentials=" << creds_str;
-		creds_file.close();
-	}
-
 	std::ifstream config_file(this->config_path.c_str(), std::ios::in | std::ios::binary);
 	std::string config_str;
 	if (!config_file.fail()) {
@@ -391,21 +369,36 @@ CefString Browser::Launcher::BuildURL() const {
 		config_file.close();
 	}
 
-#if defined(BOLT_PLUGINS)
-	std::ifstream plugin_file(this->plugin_config_path.c_str(), std::ios::in | std::ios::binary);
-	std::string plugins_str;
-	if (!plugin_file.fail()) {
-		std::stringstream ss;
-		ss << plugin_file.rdbuf();
-		plugins_str = CefURIEncode(CefString(ss.str()), true).ToString();
-		url << "&plugins=" << plugins_str;
-		plugin_file.close();
-	} else {
-		url << "&plugins=%7B%7D";
-	}
-#endif
-
 	return url.str();
+}
+
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::OpenLoginWindow(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view) {
+	CefPostTask(TID_UI, new OpenLoginWindowTask(this->client));
+	QSENDOK();
+}
+
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::LookupCharacters(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser>, std::string_view query) {
+	CefString session_id;
+	std::string_view discard;
+	bool has_session_id = false;
+	bool has_discard = false;
+	ParseQuery(query, [&](const std::string_view& key, const std::string_view& val) {
+		PQCEFSTRING(session_id)
+		PQSTRINGVIEW(discard)
+	});
+	QREQPARAM(session_id);
+	const bool discard_expired = has_discard && !discard.empty() && discard[0] != '0';
+
+	std::stringstream ss;
+	ss << "Bearer " << session_id.ToString();
+	const std::string auth_header = ss.str();
+
+	CefRefPtr<CefRequest> new_request = CefRequest::Create();
+	CefRequest::HeaderMap headers;
+	request->GetHeaderMap(headers); // doesn't include Referer header
+	headers.insert(std::make_pair(CefString(L"Authorization"), CefString(auth_header)));
+	new_request->Set(BOLT_AUTH_ORIGIN ENDPOINT_ACCOUNTS, L"GET", nullptr, headers);
+	return new URLHandlerNoCORS(new_request, this->browser->GetHost()->GetRequestContext());
 }
 
 CefRefPtr<CefResourceRequestHandler> Browser::Launcher::LaunchRs3Deb(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser>, std::string_view query) {
@@ -442,10 +435,6 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::LaunchRuneliteJarConfigu
 
 CefRefPtr<CefResourceRequestHandler> Browser::Launcher::SaveConfig(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view _) {
 	return SaveFileFromPost(request, this->config_path.c_str());
-}
-
-CefRefPtr<CefResourceRequestHandler> Browser::Launcher::SaveCredentials(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view _) {
-	return SaveFileFromPost(request, this->creds_path.c_str());
 }
 
 CefRefPtr<CefResourceRequestHandler> Browser::Launcher::OpenExternalUrl(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view _) {
@@ -724,6 +713,14 @@ void Browser::Launcher::UpdateClientList(bool need_lock_mutex) const {
 }
 #endif
 
+void Browser::Launcher::UpdateSessionList(CefRefPtr<CefListValue> session_list) const {
+	CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create("__bolt_sessionlist");
+	CefRefPtr<CefListValue> list = message->GetArgumentList();
+	list->SetSize(1);
+	list->SetList(0, session_list);
+	this->browser->GetMainFrame()->SendProcessMessage(PID_RENDERER, message);
+}
+
 void Browser::Launcher::Refresh() const {
 	// we can't just call ReloadIgnoreCache() (a.k.a. ctrl+f5) here, we need to rebuild the URL in case
 	// it has changed - especially due to the credentials file changing, which happens every 30 minutes
@@ -780,6 +777,18 @@ bool Browser::Launcher::OnProcessMessageReceived(CefRefPtr<CefBrowser>, CefRefPt
 	}
 	
 	return false;
+}
+
+void Browser::Launcher::OnAuthError(CefString& error) {
+	CefRefPtr<CefProcessMessage> message = CefProcessMessage::Create("__bolt_auth_error");
+	CefRefPtr<CefListValue> list = message->GetArgumentList();
+	list->SetString(0, error);
+	this->browser->GetMainFrame()->SendProcessMessage(PID_RENDERER, message);
+}
+
+void Browser::Launcher::GetWindowPos(int* x, int* y) const {
+	*x = this->last_x;
+	*y = this->last_y;
 }
 
 CefRefPtr<CefResourceRequestHandler> SaveFileFromPost(CefRefPtr<CefRequest> request, const std::filesystem::path::value_type* path) {

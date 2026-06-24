@@ -13,7 +13,7 @@ namespace Browser {
 		int preferred_height;
 		int startx;
 		int starty;
-		bool center_on_open; // startx and starty will be ignored if center_on_open is true
+		bool center_on_open;
 		bool resizeable;
 		bool frame;
 		bool is_devtools = false;

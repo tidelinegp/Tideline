@@ -56,17 +56,13 @@
 		class="ml-2"
 	/>
 </div>
-<br>
+<br />
 <button
 	class="p-2 mb-5 rounded-lg text-black text-sm bg-blue-500 opacity-50 enabled:cursor-pointer enabled:duration-200 enabled:opacity-100 enabled:hover:opacity-75"
 	onclick={openDataDir}
 >
 	<div class="flex">
-		<img
-			src="svgs/external-link.svg"
-			alt="Configure RuneLite"
-			class="mr-2 w-4 h-4"
-		/>
+		<img src="svgs/external-link.svg" alt="Configure RuneLite" class="mr-2 w-4 h-4" />
 		Browse App Data
 	</div>
 </button>

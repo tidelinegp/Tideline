@@ -20,7 +20,7 @@
 		setMessageInfo,
 		setMessageError,
 		updatePluginById,
-		onUpdate,
+		onUpdate
 	}: Props = $props();
 
 	let showURLEntry: boolean = $state(false);
@@ -42,17 +42,20 @@
 	const updateAllPlugins = () => {
 		disableButtons = true;
 		const promises = Object.entries(pluginList).map(([id, meta]) => updatePluginById(id, meta));
-		Promise.all(promises).then((x) => {
-			const updatedCount = x.filter(b => b).length;
-			if (updatedCount > 0) {
-				setMessageInfo(`Updated ${updatedCount} plugin(s)`);
-			} else {
-				setMessageInfo("All plugins are up-to-date");
-			}
-		}).catch((e) => setMessageError(`Error updating plugins: ${e}`)).finally(() => {
-			disableButtons = false;
-			onUpdate();
-		});
+		Promise.all(promises)
+			.then((x) => {
+				const updatedCount = x.filter((b) => b).length;
+				if (updatedCount > 0) {
+					setMessageInfo(`Updated ${updatedCount} plugin(s)`);
+				} else {
+					setMessageInfo('All plugins are up-to-date');
+				}
+			})
+			.catch((e) => setMessageError(`Error updating plugins: ${e}`))
+			.finally(() => {
+				disableButtons = false;
+				onUpdate();
+			});
 	};
 
 	const onInstallFromFolder = () => {
@@ -104,8 +107,7 @@
 				rows="1"
 				id="plugin-updater-url-input"
 				class="w-[50%] max-w-[60%] resize-x rounded border-2 border-slate-300 bg-slate-100 text-slate-950 dark:border-slate-800"
-				bind:value={textURLEntry}
-			></textarea>
+				bind:value={textURLEntry}></textarea>
 			<button
 				title="Confirm"
 				onclick={handleInstallFromURL}

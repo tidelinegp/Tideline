@@ -106,7 +106,7 @@ const downloadWithProgress = async (
 export function launchRS3Linux(
 	jx_session_id: string | null,
 	jx_character_id: string | null,
-	jx_display_name: string | null,
+	jx_display_name: string | null
 ) {
 	const launch = (hash?: string, deb?: Uint8Array) => {
 		const params: Record<string, string> = {};
@@ -240,7 +240,10 @@ export function launchRuneLite(
 				const runelite = response
 					.map((x: Record<string, string>) => x.assets)
 					.flat()
-					.find((x: Record<string, string>) => x.name.localeCompare('runelite.jar', 'en', { sensitivity: 'base' }) === 0);
+					.find(
+						(x: Record<string, string>) =>
+							x.name.localeCompare('runelite.jar', 'en', { sensitivity: 'base' }) === 0
+					);
 				if (!runelite) {
 					logger.info(`note: no runelite releases found, so skipping update check`);
 					tryLaunchExisting();
@@ -276,7 +279,7 @@ export function launchRuneLite(
 export function launchHdos(
 	jx_session_id: string | null,
 	jx_character_id: string | null,
-	jx_display_name: string | null,
+	jx_display_name: string | null
 ) {
 	const config = get(GlobalState.config);
 
@@ -360,7 +363,7 @@ export function launchOfficialClient(
 	osrs: boolean,
 	jx_session_id: string | null,
 	jx_character_id: string | null,
-	jx_display_name: string | null,
+	jx_display_name: string | null
 ) {
 	const metaPath: string = `${osrs ? 'osrs' : bolt.env.provider}-${windows ? 'win' : 'mac'}`;
 	const metaGameName: 'osrs' | 'rs3' = osrs ? 'osrs' : 'rs3';

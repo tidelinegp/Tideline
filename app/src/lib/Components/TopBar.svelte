@@ -2,13 +2,13 @@
 	import AccountDropdownContent from '$lib/Components/AccountDropdownContent.svelte';
 	import Dropdown from '$lib/Components/CommonUI/Dropdown.svelte';
 	import SettingsModal from './Modals/SettingsModal.svelte';
-	import { AuthService } from '$lib/Services/AuthService';
-	import { BoltService } from '$lib/Services/BoltService';
-	import { bolt } from '$lib/State/Bolt';
 	import { GlobalState } from '$lib/State/GlobalState';
 	import { Game } from '$lib/Util/Interfaces';
 
-	const { config, sessions } = GlobalState;
+	const { config, sessions, initialized } = GlobalState;
+	const subs = $derived(Object.keys($sessions));
+	const selectedSub = $derived($config.selected.user_id);
+	const selectedSession = $derived(selectedSub ? $sessions[selectedSub] : null);
 	let settingsModal: SettingsModal;
 </script>
 
@@ -43,22 +43,24 @@
 		<button
 			class="h-10 w-10 rounded-full bg-blue-500 text-center duration-200 hover:rotate-45 hover:opacity-75"
 			onclick={() => ($config.use_dark_theme = !$config.use_dark_theme)}
+			disabled={!$initialized}
 		>
 			<img src="svgs/lightbulb-solid.svg" class="m-auto h-6 w-6" alt="Change Theme" />
 		</button>
 		<button
 			class="h-10 w-10 rounded-full bg-blue-500 text-center duration-200 hover:rotate-45 hover:opacity-75"
 			onclick={() => settingsModal.open()}
+			disabled={!$initialized}
 		>
 			<img src="svgs/gear-solid.svg" class="m-auto h-6 w-6" alt="Settings" />
 		</button>
-		{#if $sessions.length > 0}
-			{@const selectedSession = BoltService.findSession($config.selected.user_id ?? '')}
+		{#if subs.length > 0}
 			<Dropdown align="center">
 				<button
 					class="h-11 w-48 rounded-lg border-2 border-slate-300 bg-inherit text-center font-bold text-black duration-200 hover:opacity-75 dark:border-slate-800 dark:text-slate-50"
+					disabled={!$initialized}
 				>
-					{selectedSession?.user.displayName ?? 'No user selected'}
+					{selectedSession?.displayName ?? 'No user selected'}
 				</button>
 
 				{#snippet content()}
@@ -70,12 +72,12 @@
 		{:else}
 			<button
 				class="h-11 w-48 rounded-lg border-2 border-slate-300 bg-inherit p-2 text-center font-bold text-black duration-200 hover:opacity-75 dark:border-slate-800 dark:text-slate-50"
-				onclick={() => {
-					const { origin, redirect, clientid } = bolt.env;
-					AuthService.openLoginWindow(origin, redirect, clientid);
-				}}
+				onclick={() => fetch('/login')}
+				disabled={!$initialized}
 			>
-				Login
+				{#if $initialized}
+					{'Login'}
+				{/if}
 			</button>
 		{/if}
 	</div>

@@ -1,31 +1,27 @@
 <script lang="ts">
 	import Modal from '$lib/Components/CommonUI/Modal.svelte';
-	import { GlobalState } from '$lib/State/GlobalState';
 	import { onMount } from 'svelte';
+	import { bolt } from '$lib/State/Bolt';
 
-	const { sessions } = GlobalState;
 	let modal: Modal;
 
 	onMount(() => {
-		if ($sessions.length == 0) {
-			modal.open();
-		}
+		modal.open();
 	});
 </script>
 
-<Modal bind:this={modal} canSelfClose={false} class="w-1/2 text-center">
-	<p class="p-2">
-		{atob(
-			'Qm9sdCBpcyBhbiB1bm9mZmljaWFsIHRoaXJkLXBhcnR5IGxhdW5jaGVyLiBJdCdzIGZyZWUgYW5kIG9wZW4tc291cmNlIHNvZnR3YXJlIGxpY2Vuc2VkIHVuZGVyIEFHUEwgMy4wLg=='
-		)}
-	</p>
-	<p class="p-2">
-		{atob(
-			'SmFnZXggaXMgbm90IHJlc3BvbnNpYmxlIGZvciBhbnkgcHJvYmxlbXMgb3IgZGFtYWdlIGNhdXNlZCBieSB1c2luZyB0aGlzIHByb2R1Y3Qu'
-		)}
-	</p>
+<Modal
+	bind:this={modal}
+	canSelfClose={false}
+	class="w-3/5 text-center border-2 border-solid border-black px-8 py-2"
+>
+	{#each bolt.env.disclaimer as text}
+		<p class="p-2">
+			{text}
+		</p>
+	{/each}
 	<button
-		class="m-5 rounded-lg border-2 border-blue-500 p-2 duration-200 hover:opacity-75"
-		onclick={() => modal.close()}>I Understand</button
+		class="m-5 rounded-lg border-2 border-blue-500 p-2 select-none duration-200 hover:opacity-75"
+		onclick={modal.close}>I Understand</button
 	>
 </Modal>

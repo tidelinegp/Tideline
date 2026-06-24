@@ -5,48 +5,47 @@
 	import PluginManagementDetail from './Plugin/PluginManagementDetail.svelte';
 	import PluginInstallBar from './Plugin/PluginInstallBar.svelte';
 	import { bolt } from '$lib/State/Bolt';
-	import { BoltService } from '$lib/Services/BoltService';
 	import { requestNewClientListPromise } from '$lib/Util/Functions';
+	import { savePluginConfig } from '$lib/Util/Config';
 	import type { PluginConfig, PluginMeta, PluginUpdaterConfig } from '$lib/Util/Interfaces';
 	import { clientList } from '$lib/Util/Store';
 	import { GlobalState } from '$lib/State/GlobalState';
-	import { get } from 'svelte/store';
 
-	const { config } = GlobalState;
+	const { config, sessions } = GlobalState;
 
 	let modal: Modal;
 
 	let messageText: string | null = $state(null);
 	let messageIsError: boolean = $state(false);
 	let pluginList: { [key: string]: PluginMeta } = $state(bolt.pluginConfig);
-	let accounts = $derived(BoltService.findSession($config.selected.user_id)?.accounts ?? []);
 
 	const platformFileSep: string = bolt.platform === 'windows' ? '\\' : '/';
 	const configFileName: string = 'bolt.json';
 	const sepConfigFileName: string = platformFileSep.concat(configFileName);
 	const defaultMainLuaFilename = 'main.lua';
 
-	function getAccountNameById(id?: string): string {
+	const sessionList = $derived(Object.values($sessions));
+	const getCharacterNameById = (id?: string): string => {
 		if (!id) return unnamedClientName;
-
-		return (
-			accounts.find((v) => {
-				return v.accountId == id;
-			})?.displayName || unnamedClientName
-		);
-	}
+		for (const session of sessionList) {
+			for (const [characterId, character] of Object.entries(session.characters)) {
+				if (character.displayName && characterId === id) return character.displayName;
+			}
+		}
+		return unnamedClientName;
+	};
 
 	export function open() {
 		modal.open();
 	}
 
-	const savePluginConfig = (check: boolean = true) => {
+	const saveConfig = (check: boolean = true) => {
 		pluginList = pluginList;
 		bolt.pluginConfig = pluginList;
-		BoltService.savePluginConfig(check);
+		savePluginConfig(check);
 	};
 
-	const close = () => savePluginConfig();
+	const close = () => saveConfig();
 
 	// sets the info message to some white text
 	const setMessageInfo = (msg: string) => {
@@ -200,7 +199,7 @@
 		}
 	};
 
-	const handlePluginMetaChange = () => savePluginConfig(false);
+	const handlePluginMetaChange = () => saveConfig(false);
 
 	// shows the user a file picker for .json files which will attempt to add
 	// a plugin using the manifest that the user selects, if any.
@@ -243,7 +242,8 @@
 
 		let downloadNeeded = false;
 		if (config.sha256) {
-			if (!meta.sha256 || meta.sha256.localeCompare(config.sha256, 'en', { sensitivity: 'base' })) downloadNeeded = true;
+			if (!meta.sha256 || meta.sha256.localeCompare(config.sha256, 'en', { sensitivity: 'base' }))
+				downloadNeeded = true;
 		} else if (config.version) {
 			if (meta.version !== config.version) downloadNeeded = true;
 		}
@@ -260,7 +260,7 @@
 
 		await fetch('/install-plugin?' + new URLSearchParams({ id }).toString(), {
 			method: 'POST',
-			body: data,
+			body: data
 		});
 
 		const plugin = await getPluginConfigPromiseFromDataDir(id);
@@ -274,14 +274,19 @@
 		return true;
 	};
 
-	const stopPluginPromise = (client: number, uid: number) => fetch('/stop-plugin?' + new URLSearchParams({client: client.toString(), uid: uid.toString()}).toString());
+	const stopPluginPromise = (client: number, uid: number) =>
+		fetch(
+			'/stop-plugin?' +
+				new URLSearchParams({ client: client.toString(), uid: uid.toString() }).toString()
+		);
 
-	const stopPlugin = (client: number, uid: number) => stopPluginPromise(client, uid).then(response => {
-		requestNewClientListPromise();
-		if (!response.ok) {
-			setMessageError(`couldn't stop plugin: ${response.status}: ${response.statusText}`);
-		}
-	});
+	const stopPlugin = (client: number, uid: number) =>
+		stopPluginPromise(client, uid).then((response) => {
+			requestNewClientListPromise();
+			if (!response.ok) {
+				setMessageError(`couldn't stop plugin: ${response.status}: ${response.statusText}`);
+			}
+		});
 
 	const removePluginById = async (id: string) => {
 		const meta = pluginList[id];
@@ -303,7 +308,7 @@
 		// remove from autostart
 		let autostart: { [characterID: string]: string[] } = {};
 		for (const [character, list] of Object.entries(bolt.autostart)) {
-			const newList = list.filter(x => x !== id);
+			const newList = list.filter((x) => x !== id);
 			if (newList.length > 0) autostart[character] = newList;
 		}
 		bolt.autostart = autostart;
@@ -311,17 +316,17 @@
 		// update plugin config
 		delete pluginList[id];
 		selectedPlugin = null;
-		savePluginConfig(false);
+		saveConfig(false);
 
 		// request deletion of config and data directories
 		const delete_data = typeof meta.path !== 'string';
 		const params: Record<string, string> = { id, delete_data_dir: delete_data ? '1' : '0' };
-		await fetch('/uninstall-plugin?' + new URLSearchParams(params).toString()).finally(
-			() => setMessageInfo(`plugin '${meta.name}' uninstalled`)
+		await fetch('/uninstall-plugin?' + new URLSearchParams(params).toString()).finally(() =>
+			setMessageInfo(`plugin '${meta.name}' uninstalled`)
 		);
 	};
 
-	const onManagementPluginUpdate = () => savePluginConfig();
+	const onManagementPluginUpdate = () => saveConfig();
 
 	// get connected client list - the UI can be re-opened while clients are already running
 	requestNewClientListPromise();
@@ -370,7 +375,7 @@
 				dirty = true;
 			}
 			if (dirty) {
-				savePluginConfig(false);
+				saveConfig(false);
 			}
 		});
 		managementPlugin = null;
@@ -378,7 +383,7 @@
 
 	const startPlugin = async (client: number, id: string, path: string | null) => {
 		const config = await getPluginConfigPromiseByID(id);
-		const main = (config && config.main) ? config.main : defaultMainLuaFilename;
+		const main = config && config.main ? config.main : defaultMainLuaFilename;
 		const params: Record<string, string> = { client: client.toString(), id, main };
 		if (path) {
 			const pathWithCorrectSeps = path.replaceAll('\\', '/');
@@ -396,23 +401,27 @@
 	// Watch for new clients and autostart their plugins
 	$effect(() => {
 		let promises: Promise<void[]>[] = [];
-		$clientList.filter(x => x.is_new).forEach((client) => {
-			if (!client.identity) return;
-			const pluginsToStart = bolt.autostart[client.identity];
-			if (!pluginsToStart || pluginsToStart.length === 0) return;
+		$clientList
+			.filter((x) => x.is_new)
+			.forEach((client) => {
+				if (!client.identity) return;
+				const pluginsToStart = bolt.autostart[client.identity];
+				if (!pluginsToStart || pluginsToStart.length === 0) return;
 
-			promises.push(Promise.all(
-				pluginsToStart.map(async (pluginId) => {
-					const meta = pluginList[pluginId];
-					if (meta) {
-						return startPlugin(client.uid, pluginId, meta.path || null);
-					}
-					console.warn(`Autostart plugin ${pluginId} not found in plugin list`);
-				})
-			));
-		});
-		if (promises.length > 0 && get(GlobalState.config).close_after_launch) {
-			Promise.all(promises).then(_ => fetch("/close"));
+				promises.push(
+					Promise.all(
+						pluginsToStart.map(async (pluginId) => {
+							const meta = pluginList[pluginId];
+							if (meta) {
+								return startPlugin(client.uid, pluginId, meta.path || null);
+							}
+							console.warn(`Autostart plugin ${pluginId} not found in plugin list`);
+						})
+					)
+				);
+			});
+		if (promises.length > 0 && $config.close_after_launch) {
+			Promise.all(promises).then((_) => fetch('/close'));
 		}
 	});
 </script>
@@ -422,7 +431,7 @@
 		class="left-0 float-left h-full w-[min(180px,_50%)] overflow-x-hidden overflow-y-auto border-r-2 border-slate-300 pt-2 dark:border-slate-800"
 	>
 		<button
-			class="mx-auto mb-2 w-[95%] select-none rounded-lg border-2 {(selectedClientId !== null)
+			class="mx-auto mb-2 w-[95%] select-none rounded-lg border-2 {selectedClientId !== null
 				? 'border-blue-500 text-black dark:text-white'
 				: 'border-black bg-blue-500 text-black'} p-2 font-bold hover:opacity-75"
 			onclick={() => (selectedClientId = null)}
@@ -436,11 +445,11 @@
 					selectedClientId = client.uid;
 					messageText = null;
 				}}
-				class="m-1 h-[28px] w-[95%] select-none rounded-lg border-2 {(selectedClientId === client.uid)
+				class="m-1 h-[28px] w-[95%] select-none rounded-lg border-2 {selectedClientId === client.uid
 					? 'border-black bg-blue-500 text-black'
 					: 'border-blue-500 text-black dark:text-white'} hover:opacity-75"
 			>
-				{getAccountNameById(client.identity)}
+				{getCharacterNameById(client.identity)}
 			</button>
 			<br />
 		{/each}

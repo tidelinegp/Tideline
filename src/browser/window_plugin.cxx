@@ -83,25 +83,6 @@ void Browser::PluginWindow::HandleShowDevtools() {
 	this->ShowDevTools();
 }
 
-bool Browser::PluginWindow::OnBeforePopup(
-	CefRefPtr<CefBrowser> browser,
-	CefRefPtr<CefFrame> frame,
-	int popup_id,
-	const CefString& target_url,
-	const CefString& target_frame_name,
-	CefLifeSpanHandler::WindowOpenDisposition target_disposition,
-	bool user_gesture,
-	const CefPopupFeatures& popup_features,
-	CefWindowInfo& window_info,
-	CefRefPtr<CefClient>& client,
-	CefBrowserSettings& settings,
-	CefRefPtr<CefDictionaryValue>& extra_info,
-	bool* no_javascript_access
-) {
-	// block popup creation: plugin windows can't have child windows
-	return true;
-}
-
 bool Browser::PluginWindow::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId process, CefRefPtr<CefProcessMessage> message) {
 	if (!(this->browser && this->browser->IsSame(browser))) return false;
 	const CefString name = message->GetName();

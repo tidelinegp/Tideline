@@ -15,6 +15,10 @@ if(NOT WIN32)
     string(ASCII 74 97 103 101 120 32 108 97 117 110 99 104 101 114 BOLT_PROGRAM_NAME)
     string(ASCII 82 117 110 101 83 99 97 112 101 BOLT_GAME_NAME)
     string(TOLOWER "${BOLT_GAME_NAME}" BOLT_GAME_NAME_LOWER)
+    string(ASCII 99 111 109 95 106 97 103 101 120 95 97 117 116 104 95 100 101 115 107 116 111 112 95 108 97 117 110 99 104 101 114 BOLT_CLIENT_ID)
+    string(ASCII 104 116 116 112 115 58 47 47 97 99 99 111 117 110 116 46 106 97 103 101 120 46 99 111 109 BOLT_ACCOUNT_ORIGIN)
+    string(ASCII 104 116 116 112 115 58 47 47 97 117 116 104 46 106 97 103 101 120 46 99 111 109 BOLT_AUTH_ORIGIN)
+    string(ASCII 115 101 99 117 114 101 46 114 117 110 101 115 99 97 112 101 46 99 111 109 BOLT_DOMAIN_SECURE)
 
     # .desktop file contents
     string(JOIN "\n" BOLT_DESKTOP_INFO
@@ -505,7 +509,7 @@ add_executable("${BOLT_EXE_NAME}"
     ${WINDOW_LAUNCHER_OS_SPECIFIC} src/mime.cxx src/file_manager/directory.cxx client_cmake_gen.cxx
     "${LIBRARY_IPC_OS_SPECIFIC}" ${BOLT_FILE_MANAGER_LAUNCHER_GEN} ${BOLT_STUB_INJECT_CXX}
     src/browser/window_osr.cxx src/browser/window_plugin.cxx src/browser/window_plugin_requests.cxx
-    src/browser/request.cxx
+    src/browser/request.cxx src/browser/window_login.cxx src/sha256/sha256.c
 	icon/bolt.rc
 )
 if(BOLT_STUB_INJECT_CXX)
@@ -513,6 +517,7 @@ if(BOLT_STUB_INJECT_CXX)
 endif()
 
 # Various build properties
+target_compile_definitions("${BOLT_EXE_NAME}" PUBLIC BOLT_CLIENT_ID="${BOLT_CLIENT_ID}" BOLT_ACCOUNT_ORIGIN="${BOLT_ACCOUNT_ORIGIN}" BOLT_AUTH_ORIGIN="${BOLT_AUTH_ORIGIN}" BOLT_DOMAIN_SECURE="${BOLT_DOMAIN_SECURE}")
 if(BOLT_PLUGIN_LIB_NAME)
     target_compile_definitions("${BOLT_EXE_NAME}" PUBLIC BOLT_LIB_NAME="${BOLT_PLUGIN_LIB_NAME}" BOLT_PLUGINS)
 endif()

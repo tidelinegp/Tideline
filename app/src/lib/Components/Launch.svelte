@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { BoltService } from '$lib/Services/BoltService';
 	import { bolt, Platform } from '$lib/State/Bolt';
 	import { GlobalState } from '$lib/State/GlobalState';
 	import {
@@ -8,6 +7,7 @@
 		launchRS3Linux,
 		launchRuneLite
 	} from '$lib/Util/Functions';
+	import { saveConfig } from '$lib/Util/Config';
 	import { Client, clientMap, Game } from '$lib/Util/Interfaces';
 	import { logger } from '$lib/Util/Logger';
 	import LaunchConfirmModal from './Modals/LaunchConfirmModal.svelte';
@@ -15,10 +15,13 @@
 
 	let confirmModal: LaunchConfirmModal;
 	let pluginModal: PluginModal;
-	let { config, initialized } = GlobalState;
+	let { config, initialized, sessions } = GlobalState;
 	let selectedUserId = $derived($config.selected.user_id);
-	let selectedAccountId = $derived($config.userDetails[selectedUserId ?? '']?.account_id);
-	let accounts = $derived(BoltService.findSession($config.selected.user_id)?.accounts ?? []);
+	let selectedCharacterId = $derived(
+		selectedUserId ? $config.userDetails[selectedUserId]?.account_id : null
+	);
+	let session = $derived(selectedUserId ? $sessions[selectedUserId] : null);
+	let characterIds = $derived(session ? Object.keys(session.characters) : null);
 
 	// messages about game downtime, retrieved from game server
 	let { osrsPsa = $bindable(), rs3Psa = $bindable() } = $props();
@@ -66,20 +69,15 @@
 	// when play is clicked, check the selected_play store for all relevant details
 	// calls the appropriate launch functions
 	export function launch(game: Game, client: Client): void {
-		if (!selectedUserId) {
-			return logger.warn('Please log in or select a user to play.');
+		if (!selectedUserId || !selectedCharacterId || !session) {
+			return logger.warn('please log in and select a character to play');
 		}
-		if (!selectedAccountId) {
-			return logger.warn('Please select a character from the select menu.');
-		}
-		BoltService.saveConfig();
+		saveConfig();
 
-		const session = BoltService.findSession($config.selected.user_id);
-		if (!session) return logger.warn('Unable to launch game, session was not found.');
-		const { session_id } = session;
-		const account = BoltService.findAccount(session.accounts, selectedAccountId);
-		if (!account) return logger.warn('Unable to launch game, account was not found.');
-		const { accountId, displayName } = account;
+		const { sessionId } = session;
+		const character = session.characters[selectedCharacterId];
+		if (!character) return logger.error(`character ${selectedCharacterId} not found`);
+		const { displayName } = character;
 		const isWindows = bolt.platform === Platform.Windows;
 		const isLinux = bolt.platform === Platform.Linux;
 		switch (game) {
@@ -88,21 +86,27 @@
 					case Client.official:
 						// when launching official osrs client on linux, set windows=true so that it will download the
 						// windows exe instead of the mac app, as the exe is what we want to run through wine/proton
-						launchOfficialClient(isWindows || isLinux, true, session_id, accountId, displayName);
+						launchOfficialClient(
+							isWindows || isLinux,
+							true,
+							sessionId,
+							selectedCharacterId,
+							displayName
+						);
 						break;
 					case Client.runelite:
-						launchRuneLite(session_id, accountId, displayName, false);
+						launchRuneLite(sessionId, selectedCharacterId, displayName, false);
 						break;
 					case Client.hdos:
-						launchHdos(session_id, accountId, displayName);
+						launchHdos(sessionId, selectedCharacterId, displayName);
 						break;
 				}
 				break;
 			case Game.rs3:
 				if (isLinux) {
-					launchRS3Linux(session_id, accountId, displayName);
+					launchRS3Linux(sessionId, selectedCharacterId, displayName);
 				} else {
-					launchOfficialClient(isWindows, false, session_id, accountId, displayName);
+					launchOfficialClient(isWindows, false, sessionId, selectedCharacterId, displayName);
 				}
 				break;
 		}
@@ -110,8 +114,8 @@
 
 	function handleAccountChange() {
 		if (!selectedUserId) return;
-		if (selectedAccountId) {
-			$config.userDetails[selectedUserId] = { account_id: selectedAccountId };
+		if (selectedCharacterId) {
+			$config.userDetails[selectedUserId] = { account_id: selectedCharacterId };
 		} else {
 			delete $config.userDetails[selectedUserId];
 		}
@@ -170,21 +174,24 @@
 			<select
 				class="mx-auto w-52 cursor-pointer rounded-lg border-2 border-slate-300 bg-inherit p-2 text-inherit duration-200 hover:opacity-75 dark:border-slate-800"
 				disabled={!$initialized || $config.selected.user_id === null}
-				bind:value={selectedAccountId}
+				bind:value={selectedCharacterId}
 				onchange={handleAccountChange}
 			>
 				<option value={undefined} disabled class="dark:bg-slate-900">Select an account</option>
-				{#each accounts as account}
-					<option value={account.accountId} class="dark:bg-slate-900">
-						{#if account.displayName}
-							{account.displayName}
-						{:else}
-							New Character
-						{/if}
-					</option>
+				{#if session && characterIds && characterIds.length > 0}
+					{#each characterIds as characterId}
+						{@const character = session.characters[characterId]}
+						<option value={characterId} class="dark:bg-slate-900">
+							{#if character.displayName}
+								{character.displayName}
+							{:else}
+								New Character
+							{/if}
+						</option>
+					{/each}
 				{:else}
 					<option class="dark:bg-slate-900" disabled selected>No characters</option>
-				{/each}
+				{/if}
 			</select>
 		</label>
 	</div>

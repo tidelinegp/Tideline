@@ -2,8 +2,8 @@
 	import PluginEntry from './PluginEntry.svelte';
 	import { type PluginMeta } from '$lib/Util/Interfaces';
 	import type { ClientInfo } from '$lib/Util/Store';
+	import { savePluginConfig } from '$lib/Util/Config';
 	import { bolt } from '$lib/State/Bolt';
-	import { BoltService } from '$lib/Services/BoltService';
 
 	interface Props {
 		clientId: number;
@@ -53,7 +53,7 @@
 		// Sync back and save
 		bolt.autostart = autostart;
 		autostart = autostart; // trigger Svelte reactivity
-		BoltService.savePluginConfig(false);
+		savePluginConfig(false);
 	};
 </script>
 

@@ -28,9 +28,9 @@ struct DevtoolsTask: public CefTask {
 };
 
 Browser::Window::Window(CefRefPtr<Browser::Client> client, Browser::Details details, CefString url, bool show_devtools):
-	browser_count(0), client(client.get()), show_devtools(show_devtools), details(details), window(nullptr), browser_view(nullptr), browser(nullptr), pending_child(nullptr), pending_delete(false)
+	browser_count(0), client(client.get()), show_devtools(show_devtools), details(details), window(nullptr), browser_view(nullptr), browser(nullptr), devtools(nullptr), pending_delete(false)
 {
-	fmt::print("[B] Browser::Window constructor, this={}\n", reinterpret_cast<uintptr_t>(this));
+	fmt::print("[B] Browser::Window direct constructor, this={}\n", reinterpret_cast<uintptr_t>(this));
 	CefRefPtr<CefDictionaryValue> dict = nullptr;
 	if (details.has_custom_js) {
 		dict = CefDictionaryValue::Create();
@@ -40,9 +40,9 @@ Browser::Window::Window(CefRefPtr<Browser::Client> client, Browser::Details deta
 }
 
 Browser::Window::Window(CefRefPtr<Browser::Client> client, Browser::Details details, bool show_devtools):
-	browser_count(0), client(client.get()), show_devtools(show_devtools), details(details), window(nullptr), browser_view(nullptr), browser(nullptr), pending_child(nullptr), pending_delete(false)
+	browser_count(0), client(client.get()), show_devtools(show_devtools), details(details), window(nullptr), browser_view(nullptr), browser(nullptr), devtools(nullptr), pending_delete(false)
 {
-	fmt::print("[B] Browser::Window popup constructor, this={}\n", reinterpret_cast<uintptr_t>(this));
+	fmt::print("[B] Browser::Window indirect constructor, this={}\n", reinterpret_cast<uintptr_t>(this));
 }
 
 void Browser::Window::Init(CefString url, CefRefPtr<CefDictionaryValue> extra_info) {
@@ -68,7 +68,6 @@ void Browser::Window::OnWindowClosing(CefRefPtr<CefWindow> window) {
 	fmt::print("[B] OnWindowClosing {} this={}\n", window->GetID(), reinterpret_cast<uintptr_t>(this));
 	this->window = nullptr;
 	this->browser_view = nullptr;
-	this->pending_child = nullptr;
 }
 
 CefRect Browser::Window::GetInitialBounds(CefRefPtr<CefWindow> window) {
@@ -102,12 +101,9 @@ bool Browser::Window::CanMinimize(CefRefPtr<CefWindow>) {
 
 bool Browser::Window::CanClose(CefRefPtr<CefWindow> win) {
 	fmt::print("[B] CanClose for window {}, this={}\n", window->GetID(), reinterpret_cast<uintptr_t>(this));
-
-	// empty this->children by swapping it with a local empty vector, then iterate the local vector
-	std::vector<CefRefPtr<Browser::Window>> children;
-	std::swap(this->children, children);
-	for (CefRefPtr<Window>& window: children) {
-		window->browser->GetHost()->CloseBrowser(true);
+	if (this->devtools) {
+		this->devtools->browser->GetHost()->CloseBrowser(true);
+		this->devtools = nullptr;
 	}
 
 	return true;
@@ -128,6 +124,13 @@ bool Browser::Window::GetLinuxWindowProperties(CefRefPtr<CefWindow>, CefLinuxWin
 
 CefRefPtr<CefBrowserViewDelegate> Browser::Window::GetDelegateForPopupBrowserView(CefRefPtr<CefBrowserView>, const CefBrowserSettings&, CefRefPtr<CefClient>, bool is_devtools) {
 	fmt::print("[B] GetDelegateForPopupBrowserView this={}\n", reinterpret_cast<uintptr_t>(this));
+	if (!is_devtools) {
+		return nullptr;
+	}
+	if (this->devtools) {
+		this->devtools->Focus();
+		return nullptr;
+	}
 	Browser::Details details = {
 		.preferred_width = this->popup_features.widthSet ? this->popup_features.width : 800,
 		.preferred_height = this->popup_features.heightSet ? this->popup_features.height : 608,
@@ -136,19 +139,16 @@ CefRefPtr<CefBrowserViewDelegate> Browser::Window::GetDelegateForPopupBrowserVie
 		.center_on_open = !this->popup_features.xSet || !this->popup_features.ySet,
 		.resizeable = true,
 		.frame = true,
-		.is_devtools = is_devtools,
+		.is_devtools = true,
 	};
-	this->pending_child = new Browser::Window(this->client, details, this->show_devtools);
-	return this->pending_child;
+	this->devtools = new Browser::Window(this->client, details, this->show_devtools);
+	return this->devtools;
 }
 
 bool Browser::Window::OnPopupBrowserViewCreated(CefRefPtr<CefBrowserView> browser_view, CefRefPtr<CefBrowserView> popup_browser_view, bool is_devtools) {
 	fmt::print("[B] OnPopupBrowserViewCreated this={}\n", reinterpret_cast<uintptr_t>(this));
-	this->pending_child->browser_view = popup_browser_view;
-	CefWindow::CreateTopLevelWindow(this->pending_child);
-	this->children.push_back(this->pending_child);
-	CefRefPtr<Browser::Window> child = nullptr;
-	std::swap(this->pending_child, child);
+	this->devtools->browser_view = popup_browser_view;
+	CefWindow::CreateTopLevelWindow(this->devtools);
 	return true;
 }
 
@@ -185,14 +185,6 @@ void Browser::Window::Close() {
 		}
 	} else {
 		CefPostTask(TID_UI, new CloseTask(this));
-	}
-}
-
-void Browser::Window::CloseChildrenExceptDevtools() {
-	for (CefRefPtr<Browser::Window>& window: this->children) {
-		if (!window->details.is_devtools) {
-			window->Close();
-		}
 	}
 }
 
@@ -233,9 +225,8 @@ bool Browser::Window::OnBeforePopup(
 	CefRefPtr<CefDictionaryValue>& extra_info,
 	bool* no_javascript_access
 ) {
-	fmt::print("[B] Browser::OnBeforePopup for browser {}\n", browser->GetIdentifier());
-	this->popup_features = popup_features;
-	return false;
+	// block popup creation (window.open)
+	return true;
 }
 
 void Browser::Window::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
