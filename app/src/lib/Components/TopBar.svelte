@@ -9,10 +9,12 @@
 	const subs = $derived(Object.keys($sessions));
 	const selectedSub = $derived($config.selected.user_id);
 	const selectedSession = $derived(selectedSub ? $sessions[selectedSub] : null);
-	let settingsModal: SettingsModal;
+	
+	let {
+		openSettings = $bindable(),
+		logoutConfirm = $bindable(),
+	} = $props();
 </script>
-
-<SettingsModal bind:this={settingsModal}></SettingsModal>
 
 <div
 	class="fixed top-0 flex h-16 w-screen border-b-2 border-slate-300 bg-slate-100 duration-200 dark:border-slate-800 dark:bg-slate-900"
@@ -49,7 +51,7 @@
 		</button>
 		<button
 			class="h-10 w-10 rounded-full bg-blue-500 text-center duration-200 hover:rotate-45 hover:opacity-75"
-			onclick={() => settingsModal.open()}
+			onclick={() => {console.log("b");openSettings();}}
 			disabled={!$initialized}
 		>
 			<img src="svgs/gear-solid.svg" class="m-auto h-6 w-6" alt="Settings" />
@@ -65,7 +67,7 @@
 
 				{#snippet content()}
 					<div class="w-40">
-						<AccountDropdownContent />
+						<AccountDropdownContent bind:logoutConfirm />
 					</div>
 				{/snippet}
 			</Dropdown>

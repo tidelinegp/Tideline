@@ -1,7 +1,7 @@
 import { Platform, bolt } from '$lib/State/Bolt';
 import { GlobalState } from '$lib/State/GlobalState';
 import { initConfig } from '$lib/Util/Config';
-import type { BoltMessage, Session, PluginMeta, Character } from '$lib/Util/Interfaces';
+import type { BoltMessage, Session, PluginMeta } from '$lib/Util/Interfaces';
 import { logger } from '$lib/Util/Logger';
 import { clientList } from '$lib/Util/Store';
 import BoltApp from '@/BoltApp.svelte';
@@ -31,8 +31,9 @@ const handleSessionList = async (list: { [sub: string]: Session }) => {
 		return;
 	}
 	handlingSessionList = true;
-	const discardExpired = get(GlobalState.config).discard_expired_sessions;
-	const promises = Object.values(list).map((session) => {
+	let config = get(GlobalState.config);
+	const discardExpired = config.discard_expired_sessions;
+	const promises = Object.entries(list).map(([sub, session]) => {
 		let params = new URLSearchParams({
 			session_id: session.sessionId,
 			discard: discardExpired ? '1' : '0'
@@ -59,6 +60,8 @@ const handleSessionList = async (list: { [sub: string]: Session }) => {
 					session.characters[character.accountId] = character;
 				}
 				if (session.isNew) {
+					config.selected.user_id = sub;
+					GlobalState.configHasPendingChanges = true;
 					logger.info(`logged in as ${session.displayName}#${session.suffix}`);
 					session.isNew = false;
 				}

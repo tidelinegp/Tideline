@@ -10,11 +10,7 @@
 	import { saveConfig } from '$lib/Util/Config';
 	import { Client, clientMap, Game } from '$lib/Util/Interfaces';
 	import { logger } from '$lib/Util/Logger';
-	import LaunchConfirmModal from './Modals/LaunchConfirmModal.svelte';
-	import PluginModal from './Modals/PluginModal.svelte';
 
-	let confirmModal: LaunchConfirmModal;
-	let pluginModal: PluginModal;
 	let { config, initialized, sessions } = GlobalState;
 	let selectedUserId = $derived($config.selected.user_id);
 	let selectedCharacterId = $derived(
@@ -24,7 +20,12 @@
 	let characterIds = $derived(session ? Object.keys(session.characters) : null);
 
 	// messages about game downtime, retrieved from game server
-	let { osrsPsa = $bindable(), rs3Psa = $bindable() } = $props();
+	let {
+		osrsPsa = $bindable(),
+		rs3Psa = $bindable(),
+		launchConfirm = $bindable(),
+		openPluginMenu = $bindable(),
+	} = $props();
 	const PSA_FETCH_INTERVAL_MS = 60_000;
 	let psaFetchedAt: number = 0;
 
@@ -122,9 +123,6 @@
 	}
 </script>
 
-<LaunchConfirmModal bind:this={confirmModal}></LaunchConfirmModal>
-<PluginModal bind:this={pluginModal}></PluginModal>
-
 <div class="bg-grad flex h-full flex-col border-slate-300 pt-5 duration-200 dark:border-slate-800">
 	<div class="flex flex-col items-center gap-4">
 		<img
@@ -139,7 +137,7 @@
 				if (gameEnabled) {
 					launch($config.selected.game, $config.selected.client);
 				} else {
-					confirmModal.open(launch, $config.selected.game, $config.selected.client);
+					launchConfirm(launch, $config.selected.game, $config.selected.client);
 				}
 			}}
 		>
@@ -162,9 +160,7 @@
 				disabled={!bolt.hasBoltPlugins}
 				title={bolt.hasBoltPlugins ? null : 'This feature is disabled'}
 				class="w-52 rounded-lg p-2 font-bold text-black duration-200 enabled:bg-blue-500 enabled:hover:opacity-75 disabled:bg-gray-500"
-				onclick={() => {
-					pluginModal.open();
-				}}
+				onclick={openPluginMenu}
 			>
 				Plugin menu
 			</button>

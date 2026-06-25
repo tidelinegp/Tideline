@@ -27,7 +27,7 @@
 	const close = () => saveConfig();
 </script>
 
-<Modal bind:this={modal} class="h-3/4 w-3/4 select-none" onClose={close}>
+<Modal bind:this={modal} class="h-3/4 w-3/4 select-none border-2 border-solid border-black" onClose={close}>
 	<div class="grid h-full grid-cols-4">
 		<div
 			class="flex flex-col items-center gap-2 border-r-2 border-slate-300 pt-10 dark:border-slate-800"

@@ -14,7 +14,7 @@
 	}
 </script>
 
-<Modal bind:this={modal} class="h-fit w-3/5 px-5 py-3 text-center">
+<Modal bind:this={modal} class="h-fit w-3/5 px-5 py-3 text-center border-2 border-solid border-black">
 	<div>
 		<h2 class="text-3xl font-extrabold">Game is offline</h2>
 		<br />
