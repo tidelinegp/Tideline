@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Modal from '$lib/Components/CommonUI/Modal.svelte';
 	import type { Session } from '$lib/Util/Interfaces';
+	import { logger } from '$lib/Util/Logger';
 
 	let modal: Modal;
 	let sub: string;
@@ -28,7 +29,13 @@
 				class="mx-1 mb-2 mt-5 w-[45%] rounded-lg bg-emerald-500 p-2 font-bold text-black duration-200 hover:opacity-75"
 				onclick={() => {
 					const params = new URLSearchParams({ sub });
-					fetch('/logout?'.concat(params.toString()));
+					fetch('/logout?'.concat(params.toString())).then((x) => {
+						if (x.ok) {
+							logger.info(`logged out of ${session.displayName}#${session.suffix}`);
+						} else {
+							x.text().then((text) => (logger.error(`error logging out of ${session.displayName}#${session.suffix}: ${x.status}: ${text}`)));
+						}
+					})
 					modal.close();
 				}}>Yes</button
 			>
