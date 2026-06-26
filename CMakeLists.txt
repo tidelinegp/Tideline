@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21) # Minimum CEF requirement, but building with the latest cmake is strongly recommended
-project(Bolt VERSION 0.21 LANGUAGES C CXX)
+project(Bolt VERSION 0.23 LANGUAGES C CXX)
 
 # The name of the executable - "{}.exe" on windows, both "/usr/bin/{}" and "/opt/bolt-launcher/{}" on other platforms
 set(BOLT_EXE_NAME bolt)
@@ -72,6 +72,24 @@ if(NOT WIN32)
         "    </screenshot>"
         "</screenshots>"
         "<releases>"
+        "    <release version=\"0.23.0\" date=\"2026-06-26\">"
+        "        <url type=\"details\">https://github.com/Adamcake/Bolt/releases/tag/0.23.0</url>"
+        "        <description>"
+        "            <p>Fix login issues</p>"
+        "            <p>The recent login issue was caused by a seemingly-innocent change to the way the remote login page was configured, but fixing it involved a significant rework to the launcher component of this project, and I am one person. It's likely there will be new bugs in areas that were previously working. Please report any issues, and thank you for your patience and understanding while I worked on this.</p>"
+        "            <p>Launcher:</p>"
+        "            <ul>"
+        "                <li>Fixed issues preventing people from logging into the launcher, most commonly manifesting as the \"white screen issue\"</li>"
+        "                <li>Swapped the position of the account drop-down and login/logout buttons to prevent them from overlapping</li>"
+        "                <li>Added a confirmation dialog when logging out of an account</li>"
+        "            </ul>"
+        "            <p>Plugin library:</p>"
+        "            <ul>"
+        "                <li>Added \"scale\" and \"vertexpointscaled\" API functions to render3d events, mainly for the sake of the new player avatar models</li>"
+        "                <li>Fixed game-view overlays being drawn in the wrong place for some players</li>"
+        "            </ul>"
+        "        </description>"
+        "    </release>"
         "    <release version=\"0.22.0\" date=\"2026-05-26\">"
         "        <url type=\"details\">https://github.com/Adamcake/Bolt/releases/tag/0.22.0</url>"
         "        <description>"
