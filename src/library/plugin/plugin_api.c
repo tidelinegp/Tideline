@@ -2429,10 +2429,8 @@ static int api_shaderprogram_setuniformmatrix##N##f(lua_State* state) { \
     const lua_Integer location = luaL_checkinteger(state, 2); \
     BOUNDCHECK(state, location, INT_MIN, INT_MAX, "setuniformmatrix" #N "f", "location") \
     const uint8_t transpose = lua_toboolean(state, 3); \
-    const size_t n = (size_t)(N); \
-    const size_t nsquared = n * n; \
-    double values[nsquared]; \
-    for (size_t i = 0; i < nsquared; i += 1) { \
+    double values[(size_t)(N) * (size_t)(N)]; \
+    for (size_t i = 0; i < (size_t)(N) * (size_t)(N); i += 1) { \
         values[i] = (double)luaL_checknumber(state, i + 4); \
     } \
     program->set_uniform_matrix(program->userdata, (int)location, transpose, N, values); \

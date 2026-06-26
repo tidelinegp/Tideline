@@ -18,7 +18,7 @@ uint8_t _bolt_ipc_send(BoltSocketType fd, const void* data, size_t len) {
     size_t remaining = len;
     size_t sent = 0;
     while (remaining > 0) {
-        ssize_t r = send(fd, (const uint8_t*)data + sent, remaining, SENDFLAGS);
+        const ptrdiff_t r = send(fd, (const uint8_t*)data + sent, remaining, SENDFLAGS);
         if (r == -1) {
             printf("[IPC] error: IPC send() failed, error %i\n", errno);
             errno = olderr;
@@ -35,7 +35,7 @@ uint8_t _bolt_ipc_receive(BoltSocketType fd, void* data, size_t len) {
     size_t remaining = len;
     size_t received = 0;
     while (remaining > 0) {
-        ssize_t r = recv(fd, (uint8_t*)data + received, remaining, 0);
+        const ptrdiff_t r = recv(fd, (uint8_t*)data + received, remaining, 0);
         if (r == -1) {
             printf("[IPC] error: IPC recv() failed, error %i\n", errno);
             errno = olderr;

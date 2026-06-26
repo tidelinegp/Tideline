@@ -4,21 +4,23 @@ project(Bolt VERSION 0.23 LANGUAGES C CXX)
 # The name of the executable - "{}.exe" on windows, both "/usr/bin/{}" and "/opt/bolt-launcher/{}" on other platforms
 set(BOLT_EXE_NAME bolt)
 
+# how this program is described in human-readable strings in metadata
+# not in plaintext for a reason
+string(ASCII 74 97 103 101 120 32 108 97 117 110 99 104 101 114 BOLT_PROGRAM_NAME)
+string(ASCII 82 117 110 101 83 99 97 112 101 BOLT_GAME_NAME)
+string(TOLOWER "${BOLT_GAME_NAME}" BOLT_GAME_NAME_LOWER)
+
+# some URLs related to login - again, deliberately not in plaintext
+string(ASCII 99 111 109 95 106 97 103 101 120 95 97 117 116 104 95 100 101 115 107 116 111 112 95 108 97 117 110 99 104 101 114 BOLT_CLIENT_ID)
+string(ASCII 104 116 116 112 115 58 47 47 97 99 99 111 117 110 116 46 106 97 103 101 120 46 99 111 109 BOLT_ACCOUNT_ORIGIN)
+string(ASCII 104 116 116 112 115 58 47 47 97 117 116 104 46 106 97 103 101 120 46 99 111 109 BOLT_AUTH_ORIGIN)
+string(ASCII 115 101 99 117 114 101 46 114 117 110 101 115 99 97 112 101 46 99 111 109 BOLT_DOMAIN_SECURE)
+
 if(NOT WIN32)
     # name of application in metadata, defaulting to "BoltLauncher", but usually overridden to "com.adamcake.Bolt" by flatpak for example
     if(NOT BOLT_META_NAME)
         set(BOLT_META_NAME "BoltLauncher")
     endif()
-
-    # how this program is described in human-readable strings in metadata
-    # not in plaintext for a reason
-    string(ASCII 74 97 103 101 120 32 108 97 117 110 99 104 101 114 BOLT_PROGRAM_NAME)
-    string(ASCII 82 117 110 101 83 99 97 112 101 BOLT_GAME_NAME)
-    string(TOLOWER "${BOLT_GAME_NAME}" BOLT_GAME_NAME_LOWER)
-    string(ASCII 99 111 109 95 106 97 103 101 120 95 97 117 116 104 95 100 101 115 107 116 111 112 95 108 97 117 110 99 104 101 114 BOLT_CLIENT_ID)
-    string(ASCII 104 116 116 112 115 58 47 47 97 99 99 111 117 110 116 46 106 97 103 101 120 46 99 111 109 BOLT_ACCOUNT_ORIGIN)
-    string(ASCII 104 116 116 112 115 58 47 47 97 117 116 104 46 106 97 103 101 120 46 99 111 109 BOLT_AUTH_ORIGIN)
-    string(ASCII 115 101 99 117 114 101 46 114 117 110 101 115 99 97 112 101 46 99 111 109 BOLT_DOMAIN_SECURE)
 
     # .desktop file contents
     string(JOIN "\n" BOLT_DESKTOP_INFO

@@ -1,13 +1,14 @@
 #ifndef _BOLT_CLIENT_HXX_
 #define _BOLT_CLIENT_HXX_
-#include "include/cef_values.h"
+#include "../library/ipc.h"
+
 #if defined(BOLT_PLUGINS)
 #include "window_plugin.hxx"
 #include "window_osr.hxx"
-#include "../library/ipc.h"
 #include <thread>
 #endif
 
+#include "include/cef_values.h"
 #include "include/cef_client.h"
 #include "include/cef_life_span_handler.h"
 #include "include/views/cef_window_delegate.h"

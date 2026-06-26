@@ -1,5 +1,5 @@
-#include "window_login.hxx"
 #include "client.hxx"
+#include "window_login.hxx"
 #include "include/cef_request.h"
 #include "include/cef_resource_request_handler.h"
 #include "include/cef_values.h"
@@ -292,35 +292,35 @@ CefRefPtr<CefResourceRequestHandler> Browser::LoginWindow::GetResourceRequestHan
 
     if (domain == BOLT_DOMAIN_SECURE && path == REDIRECT_PATH) {
 		std::string_view code;
-		QSTRING state;
+		CefString state;
 		bool has_code = false;
 		bool has_state = false;
 		ParseQuery(query, [&](const std::string_view& key, const std::string_view& val) {
 			PQSTRINGVIEW(code)
-			PQSTRING(state)
+			PQCEFSTRING(state)
 		});
 		if (has_code && has_state) {
 			disable_default_handling = true;
-            AUTHERRORIF(state != std::string_view(this->state1, STATE_LENGTH), "state mismatch in request");
+            AUTHERRORIF(state.ToString() != std::string_view(this->state1, STATE_LENGTH), "state mismatch in request");
 			return this->RequestOAuthToken(code);
 		}
 	}
 
     if (domain == LOCALHOST_DOMAIN && path == "/") {
         std::string_view code;
-		QSTRING state;
+		CefString state;
         std::string_view id_token;
 		bool has_code = false;
 		bool has_state = false;
         bool has_id_token = false;
 		ParseQuery(comment, [&](const std::string_view& key, const std::string_view& val) {
 			PQSTRINGVIEW(code)
-			PQSTRING(state)
+			PQCEFSTRING(state)
             PQSTRINGVIEW(id_token)
 		});
         if (has_code && has_state && has_id_token) {
             disable_default_handling = true;
-            AUTHERRORIF(state != std::string_view(this->state2, STATE_LENGTH), "state mismatch in request");
+            AUTHERRORIF(state.ToString() != std::string_view(this->state2, STATE_LENGTH), "state mismatch in request");
             return this->RequestSession(id_token);
         }
     }
