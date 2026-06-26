@@ -28,7 +28,7 @@
 			<button
 				class="mx-1 mb-2 mt-5 w-[45%] rounded-lg bg-emerald-500 p-2 font-bold text-black duration-200 hover:opacity-75"
 				onclick={() => {
-					const params = new URLSearchParams({ sub });
+					const params = new URLSearchParams({ session_id: session.sessionId });
 					fetch('/logout?'.concat(params.toString())).then((x) => {
 						if (x.ok) {
 							logger.info(`logged out of ${session.displayName}#${session.suffix}`);
