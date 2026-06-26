@@ -191,6 +191,30 @@ void Browser::Client::AddSession(const Session& session) {
 	}
 }
 
+void Browser::Client::DropSession(const std::string_view& session_id_) {
+	std::string session_id(session_id_);
+	std::lock_guard<std::mutex> _(this->sessions_lock);
+
+	// filter according to sub
+	this->sessions.erase(
+		std::remove_if(
+			this->sessions.begin(),
+			this->sessions.end(),
+			[session_id](const Session& session){return session.session_id == session_id;}
+		),
+		this->sessions.end()
+	);
+
+	// write to disk
+	this->WriteSessions();
+
+	if (this->launcher) {
+		// send new session list to render process
+		CefRefPtr<CefListValue> session_list = this->CreateSessionsList();
+		this->launcher->UpdateSessionList(session_list);
+	}
+}
+
 #if defined(BOLT_DEV_LAUNCHER_DIRECTORY)
 void Browser::Client::OnFileChange() {
 	this->launcher_lock.lock();

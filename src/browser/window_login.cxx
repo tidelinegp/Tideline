@@ -121,6 +121,7 @@ struct AuthConsentHandler: public Browser::URLHandler {
 
         // parse body of the id_token
         const std::string token = id_token.ToString();
+        fmt::println("{}", token);
         CefRefPtr<CefValue> body_json = ParseTokenBodyJSON(token);
         AUTHCHECK(body_json, "invalid json in token")
         CefRefPtr<CefDictionaryValue> body_dict = body_json->GetDictionary();

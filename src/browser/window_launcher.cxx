@@ -45,6 +45,21 @@ struct OpenLoginWindowTask: public CefTask {
 		DISALLOW_COPY_AND_ASSIGN(OpenLoginWindowTask);
 };
 
+struct CharacterLookupHandler: public Browser::URLHandlerNoCORS {
+	CharacterLookupHandler(CefRefPtr<CefRequest> request, CefRefPtr<CefRequestContext> context, CefRefPtr<Browser::Client> client, CefString session_id, bool discard): Browser::URLHandlerNoCORS(request, context), client(client), session_id(session_id), discard(discard) {}
+	void OnRequestComplete(CefRefPtr<CefURLRequest> request) override {
+		if (this->discard && this->url_request->GetResponse()->GetStatus() == 401) {
+			const std::string sid = this->session_id.ToString();
+			this->client->DropSession(sid);
+		}
+		Browser::URLHandlerNoCORS::OnRequestComplete(request);
+	}
+	private:
+		CefRefPtr<Browser::Client> client;
+		CefString session_id;
+		bool discard;
+};
+
 struct FilePicker: public CefRunFileDialogCallback, Browser::ResourceHandler {
 	FilePicker(CefRefPtr<CefBrowser> browser, std::vector<CefString> accept_filters):
 		accept_filters(accept_filters), callback(nullptr), browser_host(browser->GetHost()), ResourceHandler("text/plain") { }
@@ -246,6 +261,7 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 	// internal API endpoints - only allowed if it's a request from internal URL to internal URL
 	if (is_internal_target && is_internal_initiator) {
 		ROUTE("login", OpenLoginWindow)
+		ROUTE("logout", Logout)
 		ROUTE("characters", LookupCharacters)
 		ROUTE("launch-rs3-deb", LaunchRs3Deb)
 		ROUTE("launch-rs3-exe", LaunchRs3Exe)
@@ -377,6 +393,20 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::OpenLoginWindow(CefRefPt
 	QSENDOK();
 }
 
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::Logout(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view query) {
+	std::string_view session_id;
+	bool has_session_id;
+	ParseQuery(query, [&](const std::string_view& key, const std::string_view& val) {
+		PQSTRINGVIEW(session_id)
+	});
+	QREQPARAM(session_id);
+	this->client->DropSession(session_id);
+	// TODO: is there any way to actually invalidate a session ID? Currently our way of "logging out"
+	// is just forgetting about the session and pretending it doesn't exist anymore, but it would
+	// still be usable if someone had a copy of it...
+	QSENDOK();
+}
+
 CefRefPtr<CefResourceRequestHandler> Browser::Launcher::LookupCharacters(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser>, std::string_view query) {
 	CefString session_id;
 	std::string_view discard;
@@ -398,7 +428,7 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::LookupCharacters(CefRefP
 	request->GetHeaderMap(headers); // doesn't include Referer header
 	headers.insert(std::make_pair(CefString(L"Authorization"), CefString(auth_header)));
 	new_request->Set(BOLT_AUTH_ORIGIN ENDPOINT_ACCOUNTS, L"GET", nullptr, headers);
-	return new URLHandlerNoCORS(new_request, this->browser->GetHost()->GetRequestContext());
+	return new CharacterLookupHandler(new_request, this->browser->GetHost()->GetRequestContext(), this->client, session_id, discard_expired);
 }
 
 CefRefPtr<CefResourceRequestHandler> Browser::Launcher::LaunchRs3Deb(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser>, std::string_view query) {

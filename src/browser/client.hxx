@@ -69,6 +69,9 @@ namespace Browser {
 		/// Adds a new session, usually the end result of a LoginWindow
 		void AddSession(const Session&);
 
+		/// Removes a session from the session list according to its session_id
+		void DropSession(const std::string_view& session_id);
+
 		/// Creates a CefListValue of sessions from this->sessions, for sending to the render process
 		/// assumes sessions_lock is already obtained
 		CefRefPtr<CefListValue> CreateSessionsList();

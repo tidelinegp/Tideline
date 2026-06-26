@@ -95,6 +95,7 @@ namespace Browser {
 		*/
 
 		CefRefPtr<CefResourceRequestHandler> OpenLoginWindow(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> Logout(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 		CefRefPtr<CefResourceRequestHandler> LookupCharacters(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 		CefRefPtr<CefResourceRequestHandler> GetSessions(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 		CefRefPtr<CefResourceRequestHandler> LaunchRs3Deb(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
