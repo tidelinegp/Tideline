@@ -1,5 +1,4 @@
 #include "app.hxx"
-#include "fmt/base.h"
 #include "include/cef_process_message.h"
 #include "include/cef_v8.h"
 #include "include/cef_values.h"
@@ -206,15 +205,15 @@ void Browser::App::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<Cef
 		CefRefPtr<CefV8Value> dict = CefV8Value::CreateObject(nullptr, nullptr);
 		for (const PluginMeta& plugin_iter: plugins) {
 			CefRefPtr<CefV8Value> plugin_v8 = CefV8Value::CreateObject(nullptr, nullptr);
-			plugin_v8->SetValue(L"name", CefV8Value::CreateString(plugin_iter.name), V8_PROPERTY_ATTRIBUTE_READONLY);
-			plugin_v8->SetValue(L"version", CefV8Value::CreateString(plugin_iter.version), V8_PROPERTY_ATTRIBUTE_READONLY);
-			plugin_v8->SetValue(L"updaterURL", CefV8Value::CreateString(plugin_iter.updaterURL), V8_PROPERTY_ATTRIBUTE_READONLY);
-			plugin_v8->SetValue(L"sha256", CefV8Value::CreateString(plugin_iter.sha256), V8_PROPERTY_ATTRIBUTE_READONLY);
-			plugin_v8->SetValue(L"originalName", CefV8Value::CreateString(plugin_iter.originalName), V8_PROPERTY_ATTRIBUTE_READONLY);
+			plugin_v8->SetValue(L"name", CefV8Value::CreateString(plugin_iter.name), V8_PROPERTY_ATTRIBUTE_NONE);
+			plugin_v8->SetValue(L"version", CefV8Value::CreateString(plugin_iter.version), V8_PROPERTY_ATTRIBUTE_NONE);
+			plugin_v8->SetValue(L"updaterURL", CefV8Value::CreateString(plugin_iter.updaterURL), V8_PROPERTY_ATTRIBUTE_NONE);
+			plugin_v8->SetValue(L"sha256", CefV8Value::CreateString(plugin_iter.sha256), V8_PROPERTY_ATTRIBUTE_NONE);
+			plugin_v8->SetValue(L"originalName", CefV8Value::CreateString(plugin_iter.originalName), V8_PROPERTY_ATTRIBUTE_NONE);
 			if (plugin_iter.has_path) {
-				plugin_v8->SetValue(L"path", CefV8Value::CreateString(plugin_iter.path), V8_PROPERTY_ATTRIBUTE_READONLY);
+				plugin_v8->SetValue(L"path", CefV8Value::CreateString(plugin_iter.path), V8_PROPERTY_ATTRIBUTE_NONE);
 			}
-			dict->SetValue(plugin_iter.id, plugin_v8, V8_PROPERTY_ATTRIBUTE_READONLY);
+			dict->SetValue(plugin_iter.id, plugin_v8, V8_PROPERTY_ATTRIBUTE_NONE);
 		}
 		global->SetValue(L"plugins", dict, V8_PROPERTY_ATTRIBUTE_NONE);
 
@@ -226,7 +225,7 @@ void Browser::App::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<Cef
 				array->SetValue(i, CefV8Value::CreateString(plugin_id));
 				i += 1;
 			}
-			autostart_v8->SetValue(autostart_iter.character_id, array, V8_PROPERTY_ATTRIBUTE_READONLY);
+			autostart_v8->SetValue(autostart_iter.character_id, array, V8_PROPERTY_ATTRIBUTE_NONE);
 		}
 		global->SetValue(L"autostart", autostart_v8, V8_PROPERTY_ATTRIBUTE_NONE);
 	}
