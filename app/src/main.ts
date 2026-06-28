@@ -106,7 +106,7 @@ function initBolt(params: URLSearchParams) {
 	bolt.runeLiteInstalledId = params.get('runelite_installed_id');
 	bolt.hdosInstalledVersion = params.get('hdos_installed_version');
 
-	bolt.hasBoltPlugins = w.plugins !== null;
+	bolt.hasBoltPlugins = typeof(w.plugins) === 'object';
 	bolt.pluginConfig = w.plugins ?? {};
 	bolt.autostart = w.autostart ?? {};
 	w.plugins = undefined;

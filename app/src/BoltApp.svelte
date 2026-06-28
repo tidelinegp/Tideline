@@ -13,6 +13,7 @@
 	import { onMount } from 'svelte';
 	import LogoutConfirmModal from '$lib/Components/Modals/LogoutConfirmModal.svelte';
 	import SettingsModal from '$lib/Components/Modals/SettingsModal.svelte';
+	import { bolt } from '$lib/State/Bolt';
 
 	const logs = logger.logs;
 	let osrsPsa: string | null = null;
@@ -53,7 +54,10 @@
 	<LaunchConfirmModal bind:this={launchConfirmModal}></LaunchConfirmModal>
 	<LogoutConfirmModal bind:this={logoutConfirmModal}></LogoutConfirmModal>
 	<SettingsModal bind:this={settingsModal}></SettingsModal>
-	<PluginModal bind:this={pluginModal}></PluginModal>
+	{#if bolt.hasBoltPlugins}
+		<PluginModal bind:this={pluginModal}></PluginModal>
+	{/if}
+
 	<TopBar bind:logoutConfirm bind:openSettings />
 	<div class={$config.fetch_rss_feeds ? mainClass : mainClassNoNews}>
 		{#if $config.fetch_rss_feeds}
