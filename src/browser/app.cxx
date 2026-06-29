@@ -228,6 +228,8 @@ void Browser::App::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<Cef
 			autostart_v8->SetValue(autostart_iter.character_id, array, V8_PROPERTY_ATTRIBUTE_NONE);
 		}
 		global->SetValue(L"autostart", autostart_v8, V8_PROPERTY_ATTRIBUTE_NONE);
+		plugins.clear();
+		autostart.clear();
 	}
 #endif
 }
