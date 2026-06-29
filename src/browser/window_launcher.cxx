@@ -183,16 +183,26 @@ Browser::Launcher::Launcher(
 	}
 #if defined(BOLT_PLUGINS)
 	std::ifstream plugin_file(this->plugin_config_path.c_str(), std::ios::in | std::ios::binary);
+	CefRefPtr<CefDictionaryValue> plugins_dict;
 	if (!plugin_file.fail()) {
 		std::stringstream ss;
 		ss << plugin_file.rdbuf();
+		// CefParseJSON returns null if the file doesn't contain valid JSON
 		CefRefPtr<CefValue> json = CefParseJSON(ss.str(), JSON_PARSER_RFC);
-		CefRefPtr<CefDictionaryValue> plugins_dict = json->GetDictionary();
-		if (plugins_dict) {
-			dict->SetDictionary(L"plugins", plugins_dict);
+		if (json) {
+			// GetDictionary returns null if the top-level object in the file is not a dictionary
+			plugins_dict = json->GetDictionary();
 		}
 		plugin_file.close();
 	}
+	if (!plugins_dict) {
+		// since the svelte frontend doesn't have conditional compilation, it instead needs to pick up at runtime
+		// whether plugin support is enabled in this build or not. if this variable is undefined, that will be
+		// interpreted as having no plugin support, whereas any dict/object will be interpreted as having plugin
+		// support. therefore, even if we have nothing to send, we must still send an empty dict.
+		plugins_dict = CefDictionaryValue::Create();
+	}
+	dict->SetDictionary(L"plugins", plugins_dict);
 #endif
 	this->Init(this->BuildURL(), dict);
 }
