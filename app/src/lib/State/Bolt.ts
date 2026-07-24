@@ -31,6 +31,7 @@ export interface Bolt {
 	osrsappInstalledHash: string | null;
 	runeLiteInstalledId: string | null;
 	hdosInstalledVersion: string | null;
+	boltVersion: string | null;
 	isFlathub: boolean;
 	hasLibArchive: boolean;
 	hasBoltPlugins: boolean;
@@ -50,6 +51,7 @@ export const bolt: Bolt = {
 	osrsappInstalledHash: null,
 	runeLiteInstalledId: null,
 	hdosInstalledVersion: null,
+	boltVersion: null,
 	isFlathub: false,
 	hasLibArchive: false,
 	hasBoltPlugins: false,
