@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21) # Minimum CEF requirement, but building with the latest cmake is strongly recommended
-project(Bolt VERSION 0.23.2 LANGUAGES C CXX)
+project(Bolt VERSION 0.24 LANGUAGES C CXX)
 
 # The name of the executable - "{}.exe" on windows, both "/usr/bin/{}" and "/opt/bolt-launcher/{}" on other platforms
 set(BOLT_EXE_NAME bolt)
@@ -74,6 +74,22 @@ if(NOT WIN32)
         "    </screenshot>"
         "</screenshots>"
         "<releases>"
+        "    <release version=\"0.24.0\" date=\"2026-09-08\">"
+        "        <url type=\"details\">https://github.com/Adamcake/Bolt/releases/tag/0.24.0</url>"
+        "        <description>"
+        "            <p>Engine update</p>"
+        "            <p>Yesterday's game update brought a new version of the game engine, client version 950-1, to complement the new Vulkan beta. To be honest, when I first heard about that, I was expecting far bigger disruptions to Bolt plugins, but thankfully the only issue was relatively minor.</p>"
+        "            <p>Please note: despite the timing, this version is *not* intended to add compatibility with the Vulkan beta. Since Bolt is based entirely on OpenGL hooks, supporting the Vulkan renderer would be an immense undertaking, requiring me to start the reverse-engineering process entirely from scratch. With the official plugin API coming next month it's likely I'll never need to do this.</p>"
+        "            <p>Plugin library:</p>"
+        "            <ul>"
+        "                <li>Updated for yesterday's game engine update, which caused all icon-related plugin features to stop working</li>"
+        "            </ul>"
+        "            <p>Launcher:</p>"
+        "            <ul>"
+        "                <li>The launcher version is now shown in the general settings tab</li>"
+        "            </ul>"
+        "        </description>"
+        "    </release>"
         "    <release version=\"0.23.2\" date=\"2026-06-29\">"
         "        <url type=\"details\">https://github.com/Adamcake/Bolt/releases/tag/0.23.2</url>"
         "        <description>"
