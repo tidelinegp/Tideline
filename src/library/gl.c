@@ -952,6 +952,37 @@ static void unpack_srgb565(uint16_t packed, uint8_t out[3]) {
     //out[2] = lut5[packed & 0b00011111];
 }
 
+// frees all heap pointers from an Icon, but doesn't update its model_count, leaving it in an
+// invalid state. to make it valid, set model_count to 0 (or immediately delete or overwrite it)
+static void icon_free(const struct Icon* icon) {
+    for (size_t i = 0; i < icon->model_count; i += 1) {
+        free(icon->models[i].vertices);
+    }
+}
+
+// frees all heap pointers from an Icon and sets its model_count to 0, leaving it in a valid state
+static void icon_clear(struct Icon* icon) {
+    icon_free(icon);
+    icon->model_count = 0;
+}
+
+// copies icon data from one GLTexture2D to another GLTexture2D,
+// usually upon a full image copy from one 64x64 tex to another 64x64 tex
+static void move_icondata(struct GLTexture2D* src, struct GLTexture2D* dst) {
+    // it should never happen, but if dst already contains valid icon data, we need to delete it
+    // safely, otherwise we get a memory leak
+    icon_free(&dst->icon);
+    
+    // do the copy
+    dst->icon = src->icon;
+
+    // `model_count` indicates how many IconModels in the `models` array are valid, including having
+    // valid heap pointers for their `vertices` member. since we just transferred all those pointers
+    // to `dst`, we can now treat all the pointers and data in `src->icon.models` as invalid, simply
+    // by setting model_count to 0.
+    src->icon.model_count = 0;
+}
+
 static void handle_copy_2d_subimage(struct GLContext* c, struct GLTexture2D* src, struct GLTexture2D* dst, int sx, int sy, int dx, int dy, int w, int h) {
     if (!c->does_blit_3d_target && c->depth_of_field_enabled && dst->id == c->depth_of_field_sSourceTex) {
         if (sx == 0 && sy == 0 && dx == 0 && dy == 0 && src->width == dst->width && src->height == dst->height && src->width == w && src->height == h) {
@@ -959,7 +990,7 @@ static void handle_copy_2d_subimage(struct GLContext* c, struct GLTexture2D* src
             c->does_blit_3d_target = true;
             c->target_3d_tex = (GLint)src->id;
         }
-    } else if (!src->icon.is_big_icon && src->icon.model_count && dst->width > GAME_ITEM_ICON_SIZE && dst->height > GAME_ITEM_ICON_SIZE) {
+    } else if (!src->icon.is_big_icon && src->icon.model_count > 0 && dst->width > GAME_ITEM_ICON_SIZE && dst->height > GAME_ITEM_ICON_SIZE) {
         if (!dst->icons) {
             dst->icons = hashmap_new(sizeof(struct Icon), 256, 0, 0, _bolt_plugin_itemicon_hash, _bolt_plugin_itemicon_compare, NULL, NULL);
         }
@@ -969,14 +1000,13 @@ static void handle_copy_2d_subimage(struct GLContext* c, struct GLTexture2D* src
         src->icon.h = h;
         const struct Icon* old_icon = hashmap_set(dst->icons, &src->icon);
         if (old_icon) {
-            for (size_t i = 0; i < old_icon->model_count; i += 1) {
-                free(old_icon->models[i].vertices);
-            }
+            icon_free(old_icon);
         }
+        // since the hashmap now owns all of the iconmodel data in this texture, the data in the texture
+        // is now invalid, so set model_count to 0 to mark it as such
         src->icon.model_count = 0;
     } else if (src->icon.model_count && src->width == dst->width && src->height == dst->height) {
-        dst->icon = src->icon;
-        src->icon.model_count = 0;
+        move_icondata(src, dst);
     } else if (src->id != c->target_3d_tex) {
         for (GLsizei i = 0; i < h; i += 1) {
             memcpy(dst->data + ((ptrdiff_t)dy * (ptrdiff_t)dst->width * 4) + ((ptrdiff_t)dx * 4), src->data + ((ptrdiff_t)sy * (ptrdiff_t)src->width * 4) + ((ptrdiff_t)sx * 4), (size_t)w * 4);
@@ -1913,9 +1943,8 @@ static void glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1
             }
         } else if (target_tex) {
             struct GLTexture2D* read_tex = context_get_texture(c, read_tex_id);
-            if (read_tex && read_tex->icon.model_count && read_tex->icon.is_big_icon) {
-                target_tex->icon = read_tex->icon;
-                read_tex->icon.model_count = false;
+            if (read_tex && read_tex->icon.model_count > 0) {
+                move_icondata(read_tex, target_tex);
             }
         }
     }
@@ -2159,9 +2188,8 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                     c->target_3d_tex = c->game_view_sSceneHDRTex;
                     c->recalculate_sSceneHDRTex = false;
                     printf("new sSceneHDRTex %i\n", c->target_3d_tex);
-                } else if (target_tex && source_tex->icon.model_count && source_tex->width == target_tex->width && source_tex->height == target_tex->height) {
-                    target_tex->icon = source_tex->icon;
-                    source_tex->icon.model_count = 0;
+                } else if (target_tex && source_tex->icon.model_count > 0 && source_tex->width == target_tex->width && source_tex->height == target_tex->height) {
+                    move_icondata(source_tex, target_tex);
                 }
 
                 if (c->game_view_sSceneHDRTex == source_tex->id && c->depth_tex > 0 && !c->recalculate_depth_tex) {
@@ -2214,9 +2242,8 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                 } else if (c->recalculate_sSceneHDRTex && c->game_view_uColourTexture == target_tex_id) {
                     c->game_view_sSourceTex = (GLint)source_tex->id;
                     printf("new sSourceTex %i...\n", c->game_view_sSourceTex);
-                } else if (target_tex && source_tex->icon.model_count && source_tex->width == target_tex->width && source_tex->height == target_tex->height) {
-                    target_tex->icon = source_tex->icon;
-                    source_tex->icon.model_count = 0;
+                } else if (target_tex && source_tex->icon.model_count > 0 && source_tex->width == target_tex->width && source_tex->height == target_tex->height) {
+                    move_icondata(source_tex, target_tex);
                 }
 
                 if (pending_gameview_overlay_tex == source_tex->id) {
@@ -2301,16 +2328,11 @@ void _bolt_gl_onDeleteTextures(GLsizei n, const GLuint* textures) {
             size_t iter = 0;
             void* item;
             while (hashmap_iter((*texture)->icons, &iter, &item)) {
-                const struct Icon* icon = (struct Icon*)item;
-                for (size_t i = 0; i < icon->model_count; i += 1) {
-                    free(icon->models[i].vertices);
-                }
+                icon_free((struct Icon*)item);
             }
             hashmap_free((*texture)->icons);
         }
-        for (size_t i = 0; i < (*texture)->icon.model_count; i += 1) {
-            free((*texture)->icon.models[i].vertices);
-        }
+        icon_free(&(*texture)->icon);
         free(*texture);
     }
     _bolt_rwlock_unlock_write(&c->textures->rwlock);
@@ -2323,10 +2345,7 @@ void _bolt_gl_onClear(GLbitfield mask) {
         gl.GetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &draw_tex);
         struct GLTexture2D* tex = context_get_texture(c, draw_tex);
         tex->is_minimap_tex_big = 0;
-        for (size_t i = 0; i < tex->icon.model_count; i += 1) {
-            free(tex->icon.models[i].vertices);
-        }
-        tex->icon.model_count = 0;
+        icon_clear(&tex->icon);
     }
 }
 
@@ -2404,7 +2423,7 @@ static void drawelements_handle_2d(GLsizei count, const unsigned short* indices,
         if (count == 6) {
             drawelements_handle_2d_minimapterrain(indices, tex, projection_matrix, c, attributes);
         }
-    } else if (tex->icon.model_count && tex->icon.is_big_icon && count == 6) {
+    } else if (tex->icon.model_count > 0 && tex->icon.is_big_icon && count == 6) {
         drawelements_handle_2d_bigicon(indices, tex, projection_matrix, c, attributes);
     } else {
         void (*handler_2d)(const struct RenderBatch2D*) = is_minimap2d_target ? _bolt_plugin_handle_minimaprender2d : _bolt_plugin_handle_render2d;
@@ -2707,10 +2726,7 @@ static void drawelements_handle_2d_bigicon(const unsigned short* indices, struct
         event.rgba[i] = abgr[3 - i];
     }
     _bolt_plugin_handle_renderbigicon(&event);
-    for (size_t i = 0; i < tex->icon.model_count; i += 1) {
-        free(tex->icon.models[i].vertices);
-    }
-    tex->icon.model_count = 0;
+    icon_clear(&tex->icon);
 }
 
 // takes a plugin-level handler for render2d and a handler for rendericon, and may call each of them one or more times
