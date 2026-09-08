@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { bolt } from '$lib/State/Bolt';
 	import { logger } from '$lib/Util/Logger';
 	import { GlobalState } from '$lib/State/GlobalState';
 
@@ -57,6 +58,9 @@
 	/>
 </div>
 <br />
+<div class="mx-auto p-2">
+	Bolt Version: {bolt.boltVersion}
+</div>
 <button
 	class="p-2 mb-5 rounded-lg text-black text-sm bg-blue-500 opacity-50 enabled:cursor-pointer enabled:duration-200 enabled:opacity-100 enabled:hover:opacity-75"
 	onclick={openDataDir}

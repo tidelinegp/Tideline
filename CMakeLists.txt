@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21) # Minimum CEF requirement, but building with the latest cmake is strongly recommended
-project(Bolt VERSION 0.23 LANGUAGES C CXX)
+project(Bolt VERSION 0.23.2 LANGUAGES C CXX)
 
 # The name of the executable - "{}.exe" on windows, both "/usr/bin/{}" and "/opt/bolt-launcher/{}" on other platforms
 set(BOLT_EXE_NAME bolt)
@@ -549,7 +549,7 @@ if(BOLT_STUB_INJECT_CXX)
 endif()
 
 # Various build properties
-target_compile_definitions("${BOLT_EXE_NAME}" PUBLIC BOLT_CLIENT_ID="${BOLT_CLIENT_ID}" BOLT_ACCOUNT_ORIGIN="${BOLT_ACCOUNT_ORIGIN}" BOLT_AUTH_ORIGIN="${BOLT_AUTH_ORIGIN}" BOLT_DOMAIN_SECURE="${BOLT_DOMAIN_SECURE}")
+target_compile_definitions("${BOLT_EXE_NAME}" PUBLIC BOLT_CLIENT_ID="${BOLT_CLIENT_ID}" BOLT_ACCOUNT_ORIGIN="${BOLT_ACCOUNT_ORIGIN}" BOLT_AUTH_ORIGIN="${BOLT_AUTH_ORIGIN}" BOLT_DOMAIN_SECURE="${BOLT_DOMAIN_SECURE}" BOLT_VERSION="${PROJECT_VERSION}")
 if(BOLT_PLUGIN_LIB_NAME)
     target_compile_definitions("${BOLT_EXE_NAME}" PUBLIC BOLT_LIB_NAME="${BOLT_PLUGIN_LIB_NAME}" BOLT_PLUGINS)
 endif()

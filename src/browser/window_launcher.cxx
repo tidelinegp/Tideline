@@ -341,7 +341,7 @@ void Browser::Launcher::OnBrowserDestroyed(CefRefPtr<CefBrowserView> view, CefRe
 
 CefString Browser::Launcher::BuildURL() const {
 	std::stringstream url;
-	url << DEFAULTURL "?platform=" URLPLATFORM
+	url << DEFAULTURL "?platform=" URLPLATFORM "&bolt_version=" BOLT_VERSION
 #if defined(BOLT_FLATHUB_BUILD)
 	"&flathub=1"
 #endif
