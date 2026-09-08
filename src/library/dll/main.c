@@ -53,6 +53,7 @@ static void hook_glClear(GLbitfield);
 static void hook_glViewport(GLint, GLint, GLsizei, GLsizei);
 static void hook_glTexParameteri(GLenum, GLenum, GLint);
 static void hook_glBlendFunc(GLenum, GLenum);
+static void hook_glCopyTexSubImage2D(GLenum, GLint, GLint, GLint, GLint, GLint, GLsizei, GLsizei);
 
 static HGLRC __stdcall hook_wglCreateContextAttribsARB(HDC, HGLRC, const int*);
 
@@ -103,6 +104,7 @@ DWORD __stdcall BOLT_STUB_ENTRYNAME(struct PluginInjectParams* data) {
     libgl.BlendFunc = (void(*)(GLenum, GLenum))data->pGetProcAddress(libgl_module, "glBlendFunc");
     libgl.Clear = (void(*)(GLbitfield))data->pGetProcAddress(libgl_module, "glClear");
     libgl.ClearColor = (void(*)(GLfloat, GLfloat, GLfloat, GLfloat))data->pGetProcAddress(libgl_module, "glClearColor");
+    libgl.CopyTexSubImage2D = (void(*)(GLenum, GLint, GLint, GLint, GLint, GLint, GLsizei, GLsizei))data->pGetProcAddress(libgl_module, "glCopyTexSubImage2D");
     libgl.DeleteTextures = (void(*)(GLsizei, const GLuint*))data->pGetProcAddress(libgl_module, "glDeleteTextures");
     libgl.Disable = (void(*)(GLenum))data->pGetProcAddress(libgl_module, "glDisable");
     libgl.DrawArrays = (void(*)(GLenum, GLint, GLsizei))data->pGetProcAddress(libgl_module, "glDrawArrays");
@@ -148,6 +150,7 @@ DWORD __stdcall BOLT_STUB_ENTRYNAME(struct PluginInjectParams* data) {
                     FNHOOK(glClear)
                     FNHOOK(glViewport)
                     FNHOOK(glBlendFunc)
+                    FNHOOK(glCopyTexSubImage2D)
                 }
                 if (bolt_cmp(module_name, "gdi32.dll", 0)) {
                     FNHOOKA(SwapBuffers, SWAPBUFFERS)
@@ -445,6 +448,13 @@ static void hook_glBlendFunc(GLenum sfactor, GLenum dfactor) {
     libgl.BlendFunc(sfactor, dfactor);
     _bolt_gl_onBlendFunc(sfactor, dfactor);
     LOG("glBlendFunc end\n");
+}
+
+static void hook_glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height) {
+    LOG("glCopyTexSubImage2D\n");
+    libgl.CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    _bolt_gl_glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    LOG("glCopyTexSubImage2D end\n");
 }
 
 static HGLRC __stdcall hook_wglCreateContextAttribsARB(HDC hdc, HGLRC hglrc, const int* attribList) {

@@ -222,6 +222,8 @@ static void _bolt_init_libgl(unsigned long addr, const Elf32_Word* gnu_hash_tabl
     if (sym) libgl.Clear = sym->st_value + libgl_addr;
     sym = _bolt_lookup_symbol("glClearColor", gnu_hash_table, hash_table, string_table, symbol_table);
     if (sym) libgl.ClearColor = sym->st_value + libgl_addr;
+    sym = _bolt_lookup_symbol("glCopyTexSubImage2D", gnu_hash_table, hash_table, string_table, symbol_table);
+    if (sym) libgl.CopyTexSubImage2D = sym->st_value + libgl_addr;
     sym = _bolt_lookup_symbol("glDeleteTextures", gnu_hash_table, hash_table, string_table, symbol_table);
     if (sym) libgl.DeleteTextures = sym->st_value + libgl_addr;
     sym = _bolt_lookup_symbol("glDisable", gnu_hash_table, hash_table, string_table, symbol_table);
@@ -427,6 +429,13 @@ void glBlendFunc(GLenum sfactor, GLenum dfactor) {
     libgl.BlendFunc(sfactor, dfactor);
     _bolt_gl_onBlendFunc(sfactor, dfactor);
     LOG("glBlendFunc end\n");
+}
+
+void glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height) {
+    LOG("glCopyTexSubImage2D\n");
+    libgl.CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    _bolt_gl_onCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    LOG("glCopyTexSubImage2D end\n");
 }
 
 void* eglGetProcAddress(const char* name) {
@@ -870,6 +879,7 @@ static void* _bolt_dl_lookup(void* handle, const char* symbol) {
         if (strcmp(symbol, "glViewport") == 0) return glViewport;
         if (strcmp(symbol, "glTexParameteri") == 0) return glTexParameteri;
         if (strcmp(symbol, "glBlendFunc") == 0) return glBlendFunc;
+        if (strcmp(symbol, "glCopyTexSubImage2D") == 0) return glCopyTexSubImage2D;
     } else if (handle == libxcb_addr) {
         if (strcmp(symbol, "xcb_poll_for_event") == 0) return xcb_poll_for_event;
         if (strcmp(symbol, "xcb_poll_for_queued_event") == 0) return xcb_poll_for_queued_event;

@@ -215,6 +215,7 @@ struct GLLibFunctions {
     void (*BlendFunc)(GLenum, GLenum);
     void (*Clear)(GLbitfield);
     void (*ClearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
+    void (*CopyTexSubImage2D)(GLenum, GLint, GLint, GLint, GLint, GLint, GLsizei, GLsizei);
     void (*DeleteTextures)(GLsizei, const GLuint*);
     void (*Disable)(GLenum);
     void (*DrawArrays)(GLenum, GLint, GLsizei);
@@ -285,6 +286,9 @@ void _bolt_gl_onTexParameteri(GLenum, GLenum, GLint);
 
 /// Call this in response to glBlendFunc, which needs to be hooked from libgl.
 void _bolt_gl_onBlendFunc(GLenum, GLenum);
+
+/// Call this in response to glCopyTexSubImage2D, which needs to be hooked from libgl.
+void _bolt_gl_onCopyTexSubImage2D(GLenum, GLint, GLint, GLint, GLint, GLint, GLsizei, GLsizei);
 
 /* Implemented in os-specific code and referred to by gl.c */
 void _bolt_flash_window(void);

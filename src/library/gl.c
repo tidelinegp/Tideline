@@ -952,6 +952,38 @@ static void unpack_srgb565(uint16_t packed, uint8_t out[3]) {
     //out[2] = lut5[packed & 0b00011111];
 }
 
+static void handle_copy_2d_subimage(struct GLContext* c, struct GLTexture2D* src, struct GLTexture2D* dst, int sx, int sy, int dx, int dy, int w, int h) {
+    if (!c->does_blit_3d_target && c->depth_of_field_enabled && dst->id == c->depth_of_field_sSourceTex) {
+        if (sx == 0 && sy == 0 && dx == 0 && dy == 0 && src->width == dst->width && src->height == dst->height && src->width == w && src->height == h) {
+            printf("copy to depth-of-field tex from tex %i\n", src->id);
+            c->does_blit_3d_target = true;
+            c->target_3d_tex = (GLint)src->id;
+        }
+    } else if (!src->icon.is_big_icon && src->icon.model_count && dst->width > GAME_ITEM_ICON_SIZE && dst->height > GAME_ITEM_ICON_SIZE) {
+        if (!dst->icons) {
+            dst->icons = hashmap_new(sizeof(struct Icon), 256, 0, 0, _bolt_plugin_itemicon_hash, _bolt_plugin_itemicon_compare, NULL, NULL);
+        }
+        src->icon.x = dx;
+        src->icon.y = dy;
+        src->icon.w = w;
+        src->icon.h = h;
+        const struct Icon* old_icon = hashmap_set(dst->icons, &src->icon);
+        if (old_icon) {
+            for (size_t i = 0; i < old_icon->model_count; i += 1) {
+                free(old_icon->models[i].vertices);
+            }
+        }
+        src->icon.model_count = 0;
+    } else if (src->icon.model_count && src->width == dst->width && src->height == dst->height) {
+        dst->icon = src->icon;
+        src->icon.model_count = 0;
+    } else if (src->id != c->target_3d_tex) {
+        for (GLsizei i = 0; i < h; i += 1) {
+            memcpy(dst->data + ((ptrdiff_t)dy * (ptrdiff_t)dst->width * 4) + ((ptrdiff_t)dx * 4), src->data + ((ptrdiff_t)sy * (ptrdiff_t)src->width * 4) + ((ptrdiff_t)sx * 4), (size_t)w * 4);
+        }
+    }
+}
+
 static void update_gameview_overlay(const struct GLContext* c) {
     if (gameview_overlay_inited && gameview_overlay_width == c->game_view_w && gameview_overlay_height == c->game_view_h) return;
     if (gameview_overlay_inited) {
@@ -1669,31 +1701,8 @@ static void glCopyImageSubData(
     if (srcTarget == GL_TEXTURE_2D && dstTarget == GL_TEXTURE_2D && srcLevel == 0 && dstLevel == 0) {
         struct GLTexture2D* src = context_get_texture(c, srcName);
         struct GLTexture2D* dst = context_get_texture(c, dstName);
-        if (!c->does_blit_3d_target && c->depth_of_field_enabled && dst->id == c->depth_of_field_sSourceTex) {
-            if (srcX == 0 && srcY == 0 && dstX == 0 && dstY == 0 && src->width == dst->width && src->height == dst->height && src->width == srcWidth && src->height == srcHeight) {
-                printf("copy to depth-of-field tex from tex %i\n", src->id);
-                c->does_blit_3d_target = true;
-                c->target_3d_tex = (GLint)src->id;
-            }
-        } else if (!src->icon.is_big_icon && src->icon.model_count && dst->width > GAME_ITEM_ICON_SIZE && dst->height > GAME_ITEM_ICON_SIZE) {
-            if (!dst->icons) {
-                dst->icons = hashmap_new(sizeof(struct Icon), 256, 0, 0, _bolt_plugin_itemicon_hash, _bolt_plugin_itemicon_compare, NULL, NULL);
-            }
-            src->icon.x = dstX;
-            src->icon.y = dstY;
-            src->icon.w = srcWidth;
-            src->icon.h = srcHeight;
-            const struct Icon* old_icon = hashmap_set(dst->icons, &src->icon);
-            if (old_icon) {
-                for (size_t i = 0; i < old_icon->model_count; i += 1) {
-                    free(old_icon->models[i].vertices);
-                }
-            }
-            src->icon.model_count = 0;
-        } else if (src->id != c->target_3d_tex) {
-            for (GLsizei i = 0; i < srcHeight; i += 1) {
-                memcpy(dst->data + ((ptrdiff_t)dstY * (ptrdiff_t)dst->width * 4) + ((ptrdiff_t)dstX * 4), src->data + ((ptrdiff_t)srcY * (ptrdiff_t)src->width * 4) + ((ptrdiff_t)srcX * 4), (size_t)srcWidth * 4);
-            }
+        if (src && dst) {
+            handle_copy_2d_subimage(c, src, dst, srcX, srcY, dstX, dstY, srcWidth, srcHeight);
         }
     }
     LOG("glCopyImageSubData end\n");
@@ -2150,7 +2159,7 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                     c->target_3d_tex = c->game_view_sSceneHDRTex;
                     c->recalculate_sSceneHDRTex = false;
                     printf("new sSceneHDRTex %i\n", c->target_3d_tex);
-                } else if (target_tex && source_tex->icon.model_count && source_tex->width == GAME_ITEM_BIGICON_SIZE && source_tex->height == GAME_ITEM_BIGICON_SIZE && target_tex->width == GAME_ITEM_BIGICON_SIZE && target_tex->height == GAME_ITEM_BIGICON_SIZE) {
+                } else if (target_tex && source_tex->icon.model_count && source_tex->width == target_tex->width && source_tex->height == target_tex->height) {
                     target_tex->icon = source_tex->icon;
                     source_tex->icon.model_count = 0;
                 }
@@ -2205,7 +2214,7 @@ void _bolt_gl_onDrawArrays(GLenum mode, GLint first, GLsizei count) {
                 } else if (c->recalculate_sSceneHDRTex && c->game_view_uColourTexture == target_tex_id) {
                     c->game_view_sSourceTex = (GLint)source_tex->id;
                     printf("new sSourceTex %i...\n", c->game_view_sSourceTex);
-                } else if (target_tex && source_tex->icon.model_count && source_tex->width == GAME_ITEM_BIGICON_SIZE && source_tex->height == GAME_ITEM_BIGICON_SIZE && target_tex->width == GAME_ITEM_BIGICON_SIZE && target_tex->height == GAME_ITEM_BIGICON_SIZE) {
+                } else if (target_tex && source_tex->icon.model_count && source_tex->width == target_tex->width && source_tex->height == target_tex->height) {
                     target_tex->icon = source_tex->icon;
                     source_tex->icon.model_count = 0;
                 }
@@ -2343,6 +2352,19 @@ void _bolt_gl_onBlendFunc(GLenum sfactor, GLenum dfactor) {
     c->blend_rgb_d = dfactor;
     c->blend_alpha_s = sfactor;
     c->blend_alpha_d = dfactor;
+}
+
+void _bolt_gl_onCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height) {
+    if (target == GL_TEXTURE_2D && level == 0) {
+        struct GLContext* c = _bolt_context();
+        struct GLTexture2D* dst = CONTEXT_GET_TEX_CURRENT(c, texture_2d);
+        GLint read_tex_id = 0;
+        gl.GetFramebufferAttachmentParameteriv(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &read_tex_id);
+        struct GLTexture2D* src = context_get_texture(c, read_tex_id);
+        if (src && dst) {
+            handle_copy_2d_subimage(c, src, dst, x, y, xoffset, yoffset, width, height);
+        }
+    }
 }
 
 /* DrawElements sub-functions */
