@@ -16,7 +16,7 @@
 	import SettingsModal from '$lib/Components/Modals/SettingsModal.svelte';
 	import AvatarModal from '$lib/Components/Modals/AvatarModal.svelte';
 	import { startThemeSync } from '$lib/Util/ThemeSync';
-	import { reloadCharacters } from '$lib/Util/Characters';
+	import { markSeenClients, reloadCharacters } from '$lib/Util/Characters';
 	import { bolt } from '$lib/State/Bolt';
 
 	const logs = logger.logs;
@@ -41,7 +41,11 @@
 		fetch('/running-clients')
 			.then((r) => (r.ok ? r.json() : []))
 			.then((titles) => {
-				if (Array.isArray(titles)) clientTitles.set(titles.filter((t) => typeof t === 'string'));
+				if (Array.isArray(titles)) {
+					const list = titles.filter((t) => typeof t === 'string');
+					clientTitles.set(list);
+					markSeenClients(list);
+				}
 			})
 			.catch(() => {});
 	onMount(() => {

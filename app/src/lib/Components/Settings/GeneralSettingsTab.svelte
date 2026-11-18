@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { bolt } from '$lib/State/Bolt';
+	import { brand } from '$lib/Util/Brand';
 	import { logger } from '$lib/Util/Logger';
 	import { GlobalState } from '$lib/State/GlobalState';
 
@@ -46,7 +47,7 @@
 	<label class="opt" title={closeAfterLaunchDesc}>
 		<input id="close_after_launch" type="checkbox" bind:checked={$config.close_after_launch} />
 		<span>
-			<b>Close Bolt after launching a game</b>
+			<b>Close {brand.name} after launching a game</b>
 			<small>Quit the launcher as soon as a client starts.</small>
 		</span>
 	</label>
@@ -63,7 +64,7 @@
 	</label>
 
 	<div class="foot">
-		<span class="ver">Bolt version {bolt.boltVersion}</span>
+		<span class="ver">{brand.name} {brand.version} (based on Bolt {bolt.boltVersion})</span>
 		<button class="ghost" type="button" onclick={openDataDir}>Browse app data</button>
 	</div>
 </div>

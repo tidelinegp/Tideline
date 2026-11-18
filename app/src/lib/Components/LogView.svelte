@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Severity, type Log } from '$lib/Util/Logger';
-	import { bolt } from '$lib/State/Bolt';
+	import { brand } from '$lib/Util/Brand';
 
 	interface Props {
 		logs: Log[];
@@ -24,7 +24,7 @@
 			<span class="msg">Ready</span>
 		{/if}
 	</span>
-	<span class="ver">Bolt {bolt.boltVersion ?? ''}</span>
+	<span class="ver">{brand.name} {brand.version}</span>
 </footer>
 
 <style>

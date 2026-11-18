@@ -81,6 +81,7 @@
 		const now = Date.now();
 		$config.last_played = { ...($config.last_played ?? {}), [selectedCharacterId]: now };
 		launched.update((l) => ({ ...l, [selectedCharacterId]: now }));
+		GlobalState.clientSeen.update((s) => ({ ...s, [selectedCharacterId]: false }));
 		saveConfig();
 
 		const { sessionId } = session;

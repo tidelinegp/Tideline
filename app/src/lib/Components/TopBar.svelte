@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { GlobalState } from '$lib/State/GlobalState';
 	import { Game } from '$lib/Util/Interfaces';
+	import { brand } from '$lib/Util/Brand';
 
 	const { config, initialized } = GlobalState;
 
@@ -19,7 +20,7 @@
 			<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 10-13h-6z" /></svg>
 		</div>
 		<div>
-			<h1>Bolt</h1>
+			<h1>{brand.name}</h1>
 			<small>{today}</small>
 		</div>
 	</div>

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21) # Minimum CEF requirement, but building wit
 project(Bolt VERSION 0.24 LANGUAGES C CXX)
 
 # The name of the executable - "{}.exe" on windows, both "/usr/bin/{}" and "/opt/bolt-launcher/{}" on other platforms
-set(BOLT_EXE_NAME bolt)
+set(BOLT_EXE_NAME tideline)
 
 # how this program is described in human-readable strings in metadata
 # not in plaintext for a reason
@@ -654,18 +654,18 @@ endif()
 if(APPLE)
     # TODO: mac support
 else()
-    install(TARGETS "${BOLT_EXE_NAME}" DESTINATION "${BOLT_CEF_INSTALLDIR}/bolt-launcher")
+    install(TARGETS "${BOLT_EXE_NAME}" DESTINATION "${BOLT_CEF_INSTALLDIR}/tideline")
     if(NOT BOLT_CEF_RESOURCEDIR_OVERRIDE)
-        install(DIRECTORY "${CEF_ROOT}/Resources/" DESTINATION "${BOLT_CEF_INSTALLDIR}/bolt-launcher" USE_SOURCE_PERMISSIONS)
+        install(DIRECTORY "${CEF_ROOT}/Resources/" DESTINATION "${BOLT_CEF_INSTALLDIR}/tideline" USE_SOURCE_PERMISSIONS)
     endif()
     if(BOLT_DO_INSTALL_LIBCEF)
-        install(DIRECTORY "${CEF_ROOT}/${CMAKE_BUILD_TYPE}/" DESTINATION "${BOLT_CEF_INSTALLDIR}/bolt-launcher" USE_SOURCE_PERMISSIONS)
+        install(DIRECTORY "${CEF_ROOT}/${CMAKE_BUILD_TYPE}/" DESTINATION "${BOLT_CEF_INSTALLDIR}/tideline" USE_SOURCE_PERMISSIONS)
     endif()
 endif()
 
 # install libarchive dll on windows
 if(WIN32 AND BOLT_LIBARCHIVE_DIR)
-    install(FILES "${BOLT_LIBARCHIVE_DIR}/bin/archive.dll" DESTINATION "${BOLT_CEF_INSTALLDIR}/bolt-launcher")
+    install(FILES "${BOLT_LIBARCHIVE_DIR}/bin/archive.dll" DESTINATION "${BOLT_CEF_INSTALLDIR}/tideline")
 endif()
 
 # Finally, install shell script and metadata

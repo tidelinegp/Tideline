@@ -47,7 +47,7 @@ int XIOErrorHandlerImpl(Display* display) {
 constexpr int img_size = 24;
 constexpr int img_bps = 8;
 
-#define PROGRAM_DIRNAME "bolt-launcher"
+#define PROGRAM_DIRNAME "tideline"
 
 int BoltRunBrowserProcess(CefMainArgs, CefRefPtr<Browser::App>);
 bool LockXdgDirectories(std::filesystem::path&, std::filesystem::path&, std::filesystem::path&);
@@ -312,6 +312,7 @@ bool LockXdgDirectories(std::filesystem::path& config_dir, std::filesystem::path
 	runtime_dir.append("run");
 
 	std::error_code err;
+	const bool first_run = !std::filesystem::exists(appdata_dir, err);
 	std::filesystem::create_directories(config_dir, err);
 	if (err.value() != 0) {
 		fmt::print("Could not create config directories (error {}) {}/{}\n", err.value(), appdata, PROGRAM_DIRNAME);
@@ -326,6 +327,22 @@ bool LockXdgDirectories(std::filesystem::path& config_dir, std::filesystem::path
 	if (err.value() != 0) {
 		fmt::print("Could not create runtime directory (error {}) {}/{}\n", err.value(), appdata, PROGRAM_DIRNAME);
 		return false;
+	}
+
+	if (first_run) {
+		// This app used to share the original Bolt's data folder. On the very first run, bring over the
+		// saved logins and settings from it (copies only, nothing is changed there) so nobody has to
+		// log in again.
+		std::filesystem::path old_dir(appdata);
+		old_dir.append("bolt-launcher");
+		std::error_code copy_err;
+		const auto copy_if_present = [&](const std::filesystem::path& from, const std::filesystem::path& to) {
+			if (std::filesystem::exists(from, copy_err)) {
+				std::filesystem::copy_file(from, to, std::filesystem::copy_options::skip_existing, copy_err);
+			}
+		};
+		copy_if_present(old_dir / "config" / "launcher.json", config_dir / "launcher.json");
+		copy_if_present(old_dir / "data" / "creds", data_dir / "creds");
 	}
 
 	std::filesystem::path data_lock = appdata_dir;

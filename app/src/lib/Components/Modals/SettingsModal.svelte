@@ -5,6 +5,7 @@
 	import Rs3SettingsTab from '$lib/Components/Settings/Rs3SettingsTab.svelte';
 	import AppearanceSettingsTab from '$lib/Components/Settings/AppearanceSettingsTab.svelte';
 	import IntegrationsSettingsTab from '$lib/Components/Settings/IntegrationsSettingsTab.svelte';
+	import AboutSettingsTab from '$lib/Components/Settings/AboutSettingsTab.svelte';
 	import { saveConfig } from '$lib/Util/Config';
 
 	// settings categories
@@ -13,7 +14,8 @@
 		appearance,
 		integrations,
 		osrs,
-		rs3
+		rs3,
+		about
 	}
 
 	let modal: Modal;
@@ -24,7 +26,8 @@
 		{ id: Tab.appearance, label: 'Appearance' },
 		{ id: Tab.integrations, label: 'Integrations' },
 		{ id: Tab.osrs, label: 'OSRS' },
-		{ id: Tab.rs3, label: 'RS3' }
+		{ id: Tab.rs3, label: 'RS3' },
+		{ id: Tab.about, label: 'About' }
 	];
 
 	export function open() {
@@ -54,6 +57,8 @@
 				<IntegrationsSettingsTab />
 			{:else if openTab == Tab.osrs}
 				<OsrsSettingsTab />
+			{:else if openTab == Tab.about}
+				<AboutSettingsTab />
 			{:else if openTab == Tab.rs3}
 				<Rs3SettingsTab />
 			{/if}

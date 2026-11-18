@@ -2,16 +2,17 @@
 	import { GlobalState } from '$lib/State/GlobalState';
 	import type { Session } from '$lib/Util/Interfaces';
 	import WindowControls from '$lib/Components/WindowControls.svelte';
-	import { reloadCharacters } from '$lib/Util/Characters';
+	import { reloadCharacters, titleMatches } from '$lib/Util/Characters';
 
-	const { config, sessions, initialized, launched, clientTitles } = GlobalState;
+	const { config, sessions, initialized, launched, clientTitles, clientSeen } = GlobalState;
 
 	// a character counts as running when a game window with its name is open, or for a short grace
 	// period after launching it (the window only appears once the client has started up)
 	const GRACE_MS = 60_000;
 	function isRunning(name: string | undefined, characterId: string): boolean {
-		const n = name?.trim().toLowerCase();
-		if (n && $clientTitles.some((t) => t.toLowerCase().includes(` - ${n}`))) return true;
+		if (titleMatches($clientTitles, name)) return true;
+		// the window was open after launching and is gone now: closed, so no longer running
+		if ($clientSeen[characterId]) return false;
 		const at = $launched[characterId];
 		return !!at && Date.now() - at < GRACE_MS;
 	}

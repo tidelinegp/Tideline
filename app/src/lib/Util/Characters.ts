@@ -8,6 +8,32 @@ import { get } from 'svelte/store';
 
 let reloading = false;
 
+/** True when one of the open game window titles belongs to a character with this name. */
+export function titleMatches(titles: string[], name: string | undefined): boolean {
+	const n = name?.trim().toLowerCase();
+	return !!n && titles.some((t) => t.toLowerCase().includes(` - ${n}`));
+}
+
+/** Remembers which launched characters have shown their game window, see GlobalState.clientSeen. */
+export function markSeenClients(titles: string[]) {
+	const launched = get(GlobalState.launched);
+	const sessions = get(GlobalState.sessions);
+	const seen = get(GlobalState.clientSeen);
+	const next = { ...seen };
+	let changed = false;
+	for (const id of Object.keys(launched)) {
+		if (next[id]) continue;
+		for (const session of Object.values(sessions)) {
+			if (titleMatches(titles, session.characters?.[id]?.displayName)) {
+				next[id] = true;
+				changed = true;
+				break;
+			}
+		}
+	}
+	if (changed) GlobalState.clientSeen.set(next);
+}
+
 async function load(session: Session): Promise<Session['characters'] | null> {
 	// discard=0: never log an account out because of a refresh that failed
 	const params = new URLSearchParams({ session_id: session.sessionId, discard: '0' });
