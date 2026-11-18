@@ -10,5 +10,7 @@ export const GlobalState = {
 	config: writable<Config>(defaultConfig),
 	sessions: writable<{ [sub: string]: Session }>({}),
 	// characters launched during this run of the launcher, by character id (ms since epoch)
-	launched: writable<{ [character_id: string]: number }>({})
+	launched: writable<{ [character_id: string]: number }>({}),
+	// titles of the game windows currently open on this PC, polled from the native app
+	clientTitles: writable<string[]>([])
 };

@@ -13,6 +13,10 @@
 #include <fstream>
 #include <sstream>
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 #if defined(HAS_LIBARCHIVE) && defined(BOLT_PLUGINS)
 #include <archive.h>
 #include <archive_entry.h>
@@ -316,6 +320,7 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 		ROUTE("close", Close)
 		ROUTE("minimize", Minimize)
 		ROUTE("toggle-maximize", ToggleMaximize)
+		ROUTE("running-clients", RunningClients)
 		ROUTEIFPLUGINS("save-plugin-config", SavePluginConfig)
 		ROUTEIFPLUGINS("list-game-clients", ListGameClients)
 		ROUTEIFPLUGINS("read-json-file", ReadJsonFile)
@@ -557,6 +562,45 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::Minimize(CefRefPtr<CefRe
 CefRefPtr<CefResourceRequestHandler> Browser::Launcher::ToggleMaximize(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
 	CefPostTask(TID_UI, new WindowControlTask(this->window, WindowControlTask::Action::ToggleMaximize));
 	QSENDOK();
+}
+
+#if defined(_WIN32)
+// collects the titles of visible top-level windows that look like a game client, e.g. "RuneLite - Name"
+static BOOL CALLBACK CollectClientTitles(HWND hwnd, LPARAM param) {
+	if (!IsWindowVisible(hwnd)) return TRUE;
+	wchar_t buf[256];
+	const int len = GetWindowTextW(hwnd, buf, 256);
+	if (len <= 0) return TRUE;
+	const std::wstring title(buf, static_cast<size_t>(len));
+	if (title.find(L"RuneLite") == std::wstring::npos
+		&& title.find(L"RuneScape") == std::wstring::npos
+		&& title.find(L"HDOS") == std::wstring::npos) {
+		return TRUE;
+	}
+	reinterpret_cast<std::vector<std::string>*>(param)->push_back(CefString(title).ToString());
+	return TRUE;
+}
+#endif
+
+// Lets the UI see which game clients are open right now, so it can show which characters are running
+// even after the launcher itself was closed and reopened. Only titles of game windows are returned.
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::RunningClients(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
+	std::string json = "[";
+#if defined(_WIN32)
+	std::vector<std::string> titles;
+	EnumWindows(CollectClientTitles, reinterpret_cast<LPARAM>(&titles));
+	for (size_t i = 0; i < titles.size(); i += 1) {
+		if (i > 0) json += ",";
+		json += "\"";
+		for (const char c : titles[i]) {
+			if (c == '"' || c == '\\') json += '\\';
+			if (static_cast<unsigned char>(c) >= 0x20) json += c;
+		}
+		json += "\"";
+	}
+#endif
+	json += "]";
+	return new Browser::ResourceHandler(json, 200, "application/json");
 }
 
 CefRefPtr<CefDragHandler> Browser::Launcher::GetDragHandler() {

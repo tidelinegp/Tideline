@@ -153,7 +153,11 @@
 <section class="hero" aria-label="Ready to play">
 	<div class="who">
 		<div class="ring" aria-hidden="true">
-			{(selectedCharacter?.displayName?.trim()[0] ?? '?').toUpperCase()}
+			{#if selectedUserId && $config.avatars?.[selectedUserId]}
+				<img src={$config.avatars[selectedUserId]} alt="" />
+			{:else}
+				{(selectedCharacter?.displayName?.trim()[0] ?? '?').toUpperCase()}
+			{/if}
 		</div>
 		<div class="id">
 			<div class="eyebrow">{selectedCharacter ? 'Ready to play' : 'Pick a character'}</div>
@@ -244,6 +248,13 @@
 		color: var(--gold);
 		background: color-mix(in srgb, var(--gold) 10%, var(--inp));
 		border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--inpb));
+		overflow: hidden;
+	}
+	.ring img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
 	}
 	.id {
 		min-width: 0;

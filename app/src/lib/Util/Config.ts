@@ -34,6 +34,8 @@ export interface Config {
 	accent?: string | null;
 	/** when each character was last launched, in ms since epoch */
 	last_played?: { [character_id: string]: number };
+	/** picture for each Jagex account, as an image data URL or web link, keyed by account id (sub) */
+	avatars?: { [sub: string]: string };
 	selected: {
 		game: Game;
 		client: Client;

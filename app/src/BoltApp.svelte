@@ -14,6 +14,7 @@
 	import { onMount, tick } from 'svelte';
 	import LogoutConfirmModal from '$lib/Components/Modals/LogoutConfirmModal.svelte';
 	import SettingsModal from '$lib/Components/Modals/SettingsModal.svelte';
+	import AvatarModal from '$lib/Components/Modals/AvatarModal.svelte';
 	import { bolt } from '$lib/State/Bolt';
 
 	const logs = logger.logs;
@@ -27,6 +28,25 @@
 	let settingsModal: SettingsModal;
 	let pluginModal: PluginModal;
 	let launchPanel: Launch;
+	let avatarModal: AvatarModal;
+	const editAvatar = (sub: string, name: string) => avatarModal.open(sub, name);
+
+	// ask the native app which game windows are open, so running characters are shown even after
+	// the launcher was closed and reopened
+	const { clientTitles } = GlobalState;
+	const POLL_MS = 4000;
+	const pollClients = () =>
+		fetch('/running-clients')
+			.then((r) => (r.ok ? r.json() : []))
+			.then((titles) => {
+				if (Array.isArray(titles)) clientTitles.set(titles.filter((t) => typeof t === 'string'));
+			})
+			.catch(() => {});
+	onMount(() => {
+		pollClients();
+		const timer = setInterval(pollClients, POLL_MS);
+		return () => clearInterval(timer);
+	});
 
 	let launchConfirm = (launch: (game: Game, client: Client) => void, game: Game, client: Client) => launchConfirmModal.open(launch, game, client);
 	let logoutConfirm = (sub: string, session: Session) => (logoutConfirmModal.open(sub, session))
@@ -51,6 +71,7 @@
 	<LaunchConfirmModal bind:this={launchConfirmModal}></LaunchConfirmModal>
 	<LogoutConfirmModal bind:this={logoutConfirmModal}></LogoutConfirmModal>
 	<SettingsModal bind:this={settingsModal}></SettingsModal>
+	<AvatarModal bind:this={avatarModal}></AvatarModal>
 	{#if bolt.hasBoltPlugins}
 		<PluginModal bind:this={pluginModal}></PluginModal>
 	{/if}
@@ -78,7 +99,7 @@
 			{/if}
 			<LogView logs={$logs} />
 		</section>
-		<AccountSidebar {logoutConfirm} onLaunch={launchCharacter} />
+		<AccountSidebar {logoutConfirm} onLaunch={launchCharacter} onEditAvatar={editAvatar} />
 	</div>
 </MainLayout>
 

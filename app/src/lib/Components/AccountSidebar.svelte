@@ -3,7 +3,17 @@
 	import type { Session } from '$lib/Util/Interfaces';
 	import WindowControls from '$lib/Components/WindowControls.svelte';
 
-	const { config, sessions, initialized, launched } = GlobalState;
+	const { config, sessions, initialized, launched, clientTitles } = GlobalState;
+
+	// a character counts as running when a game window with its name is open, or for a short grace
+	// period after launching it (the window only appears once the client has started up)
+	const GRACE_MS = 60_000;
+	function isRunning(name: string | undefined, characterId: string): boolean {
+		const n = name?.trim().toLowerCase();
+		if (n && $clientTitles.some((t) => t.toLowerCase().includes(` - ${n}`))) return true;
+		const at = $launched[characterId];
+		return !!at && Date.now() - at < GRACE_MS;
+	}
 
 	// "5m", "3h", "2d" since the character was last launched, empty if never
 	function short(ms: number | undefined): string {
@@ -17,10 +27,12 @@
 
 	let {
 		logoutConfirm,
-		onLaunch
+		onLaunch,
+		onEditAvatar
 	}: {
 		logoutConfirm: (sub: string, session: Session) => void;
 		onLaunch: (sub: string, characterId: string) => void;
+		onEditAvatar: (sub: string, name: string) => void;
 	} = $props();
 
 	let collapsed: { [sub: string]: boolean } = $state({});
@@ -63,12 +75,27 @@
 			<section class="acct">
 				<div class="acct-h">
 					<button
+						class="avatar"
+						type="button"
+						title="Change picture"
+						aria-label="Change picture for {session.displayName}"
+						onclick={() => onEditAvatar(sub, session.displayName)}
+					>
+						{#if $config.avatars?.[sub]}
+							<img src={$config.avatars[sub]} alt="" />
+						{:else}
+							{initial(session.displayName)}
+						{/if}
+						<span class="edit" aria-hidden="true">
+							<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" /></svg>
+						</span>
+					</button>
+					<button
 						class="acct-toggle"
 						type="button"
 						aria-expanded={!collapsed[sub]}
 						onclick={() => (collapsed[sub] = !collapsed[sub])}
 					>
-						<span class="avatar">{initial(session.displayName)}</span>
 						<span class="t">
 							<b>{session.displayName}</b>
 							<small>{chars.length} {chars.length === 1 ? 'character' : 'characters'}</small>
@@ -94,7 +121,7 @@
 								disabled={!$initialized}
 								onclick={() => pick(sub, characterId)}
 							>
-								<span class="dot" class:run={!!$launched[characterId]}></span>
+								<span class="dot" class:run={isRunning(character.displayName, characterId)}></span>
 								<span class="n">{character.displayName || 'New Character'}</span>
 								<span class="when">{short($config.last_played?.[characterId])}</span>
 								<span class="go">PLAY</span>
@@ -181,14 +208,19 @@
 		background: none;
 		border: 0;
 		color: var(--txt);
-		padding: 12px 8px 10px 14px;
+		padding: 12px 8px 10px 10px;
 		cursor: pointer;
 		text-align: left;
 	}
 	.avatar {
-		width: 30px;
-		height: 30px;
-		border-radius: 9px;
+		position: relative;
+		margin: 10px 0 8px 14px;
+		overflow: hidden;
+		cursor: pointer;
+		padding: 0;
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
 		display: grid;
 		place-items: center;
 		font: 800 13px var(--disp);
@@ -196,6 +228,24 @@
 		border: 1px solid var(--inpb);
 		color: var(--gold);
 		flex: none;
+	}
+	.avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.avatar .edit {
+		position: absolute;
+		inset: 0;
+		display: none;
+		place-items: center;
+		background: rgba(0, 0, 0, 0.55);
+		color: #fff;
+	}
+	.avatar:hover .edit,
+	.avatar:focus-visible .edit {
+		display: grid;
 	}
 	.t {
 		min-width: 0;
