@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { GlobalState } from '$lib/State/GlobalState';
 	import {
+		autoThemeId,
 		customThemeId,
 		defaultCustom,
 		defaultThemeId,
@@ -39,6 +40,19 @@
 	<section>
 		<h4>Themes</h4>
 		<div class="grid">
+			<button
+				type="button"
+				class="card"
+				aria-pressed={themeId === autoThemeId}
+				onclick={() => ($config.theme = autoThemeId)}
+				title="Tideline when Windows is in dark mode, Sandbar when it is in light mode"
+			>
+				<span class="sw split" style="background:linear-gradient(135deg, {themes[0].bg} 50%, {themes[1].bg} 50%)">
+					<i style="background:{themes[0].accent}"></i>
+					<i style="background:{themes[1].accent}"></i>
+				</span>
+				<span class="name">Match Windows</span>
+			</button>
 			{#each themes as theme (theme.id)}
 				<button
 					type="button"

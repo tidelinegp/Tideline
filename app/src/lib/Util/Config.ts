@@ -70,7 +70,7 @@ export const defaultConfig: Config = {
 	runelite_custom_jar: null,
 	runelite_launch_command: null,
 	hdos_launch_command: null,
-	theme: 'tideline',
+	theme: 'auto',
 	dashboard_url: 'http://127.0.0.1:8080',
 	show_dashboard_button: false,
 	sync_dashboard_theme: false,

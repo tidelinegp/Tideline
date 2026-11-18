@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { GlobalState } from '$lib/State/GlobalState';
-	import { themeColors, themeIsDark, themeStyle } from '$lib/Util/Themes';
+	import { osPrefersDark, resolveThemeId, themeColors, themeIsDark, themeStyle } from '$lib/Util/Themes';
 	interface Props {
 		children?: import('svelte').Snippet;
 	}
@@ -8,7 +8,19 @@
 	let { children }: Props = $props();
 
 	const { config } = GlobalState;
-	const colors = $derived(themeColors($config.theme, $config.custom_theme));
+
+	// follows Windows light/dark for the "Match Windows" theme
+	let osDark = $state(osPrefersDark());
+	$effect(() => {
+		const query = window.matchMedia('(prefers-color-scheme: light)');
+		const onChange = () => (osDark = !query.matches);
+		query.addEventListener('change', onChange);
+		return () => query.removeEventListener('change', onChange);
+	});
+
+	const colors = $derived(
+		themeColors($config.theme === 'custom' ? 'custom' : resolveThemeId($config.theme, osDark), $config.custom_theme)
+	);
 	const darkTheme = $derived(themeIsDark(colors));
 	const vars = $derived(themeStyle(colors));
 

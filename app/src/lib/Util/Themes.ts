@@ -38,14 +38,29 @@ export const themes: Theme[] = [
 	{ id: 'mint', name: 'Mint', bg: '#eef6f1', accent: '#0f766e', accent2: '#b45309', txt: '#17261f' }
 ];
 
-export const defaultThemeId = 'tideline';
+/** "Match Windows": Tideline when Windows is in dark mode, Sandbar when it is in light mode. */
+export const autoThemeId = 'auto';
+export const defaultThemeId = autoThemeId;
 export const customThemeId = 'custom';
+
+/** Whether Windows (the browser) currently prefers dark apps. Assumes dark if it cannot tell. */
+export function osPrefersDark(): boolean {
+	if (typeof window === 'undefined' || !window.matchMedia) return true;
+	return window.matchMedia('(prefers-color-scheme: light)').matches === false;
+}
+
+/** The concrete theme id for a saved one: "auto" (or none saved) becomes Tideline or Sandbar. */
+export function resolveThemeId(id: string | undefined, dark: boolean = osPrefersDark()): string {
+	if (id === undefined || id === autoThemeId) return dark ? 'tideline' : 'sandbar';
+	return id;
+}
 export const defaultCustom: ThemeColors = { bg: '#10141c', accent: '#f0c14b', accent2: '#6cb2ff', txt: '#e8ebf2' };
 
 /** The four colours behind a theme id, or behind the custom theme. Unknown ids fall back to the default. */
 export function themeColors(id: string | undefined, custom: ThemeColors | undefined): ThemeColors {
 	if (id === customThemeId) return normalise(custom ?? defaultCustom);
-	return themes.find((t) => t.id === id) ?? themes[0];
+	const resolved = resolveThemeId(id);
+	return themes.find((t) => t.id === resolved) ?? themes[0];
 }
 
 export function isValidHex(value: unknown): value is string {

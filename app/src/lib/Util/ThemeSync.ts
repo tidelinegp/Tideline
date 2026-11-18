@@ -1,5 +1,5 @@
 import { GlobalState } from '$lib/State/GlobalState';
-import { defaultCustom, defaultThemeId } from '$lib/Util/Themes';
+import { autoThemeId, defaultCustom, defaultThemeId, resolveThemeId } from '$lib/Util/Themes';
 import { get } from 'svelte/store';
 
 // Keeps the launcher's colour theme in step with a dashboard running on this PC, if the user has
@@ -48,7 +48,7 @@ export function startThemeSync(): () => void {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					theme: c.theme ?? defaultThemeId,
+					theme: resolveThemeId(c.theme), // the dashboard does not know "Match Windows", so it gets the theme showing now
 					custom: c.custom_theme ?? defaultCustom,
 					updated
 				})
@@ -76,6 +76,12 @@ export function startThemeSync(): () => void {
 		}
 		const mine = get(config).theme_updated ?? 0;
 		if (!(typeof remote.updated === 'number' && remote.updated > mine)) return;
+		const local = get(config).theme;
+		if ((local === undefined || local === autoThemeId) && remote.theme === resolveThemeId(local)) {
+			// "Match Windows" already shows exactly this theme: keep following Windows
+			config.update((x) => ({ ...x, theme_updated: remote.updated }));
+			return;
+		}
 		const custom =
 			remote.custom && ['bg', 'accent', 'accent2', 'txt'].every((k) => isHex((remote.custom as never)[k]))
 				? remote.custom
