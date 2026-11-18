@@ -7,3 +7,6 @@ GPUCache
 
 # This file is created if you configure clang LSP manually (e.g. not using VSCode)
 **/compile_commands.json
+
+installer/stage/
+installer/output/

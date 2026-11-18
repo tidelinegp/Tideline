@@ -34,7 +34,21 @@ static bool FindJava(const wchar_t* java_home, std::wstring& out) {
 			return true;
 		}
 	}
+	// Java that ships with Tideline, in a "jre" folder next to the program, so nothing else needs installing
+	{
+		wchar_t exe_buf[MAX_PATH];
+		const DWORD exe_len = GetModuleFileNameW(nullptr, exe_buf, MAX_PATH);
+		if (exe_len > 0 && exe_len < MAX_PATH) {
+			std::filesystem::path bundled = std::filesystem::path(exe_buf).parent_path() / L"jre" / L"bin" / L"javaw.exe";
+			std::error_code ec;
+			if (std::filesystem::exists(bundled, ec)) {
+				out = bundled;
+				return true;
+			}
+		}
+	}
 	const char* path = getenv("PATH");
+	if (!path) return false;
 	while (true) {
 		const char* next_semicolon = strchr(path, ';');
 		const bool is_last = next_semicolon == nullptr;
