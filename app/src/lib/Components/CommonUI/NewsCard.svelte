@@ -16,14 +16,14 @@
 		<div class="text"><div class="bar w"></div><div class="bar n"></div></div>
 	</div>
 {:else if newsItem}
-	<a
-		class="row"
-		href={newsItem.url}
-		target="_blank"
-		rel="noopener noreferrer"
-		onclick={(evt) => {
-			evt.preventDefault();
-			fetch('/open-external-url', { method: 'POST', body: newsItem.url });
+	<!-- not an <a href>: the browser would show the link address in a bar at the bottom on hover -->
+	<div
+		class="row link"
+		role="link"
+		tabindex="0"
+		onclick={() => fetch('/open-external-url', { method: 'POST', body: newsItem.url })}
+		onkeydown={(evt) => {
+			if (evt.key === 'Enter') fetch('/open-external-url', { method: 'POST', body: newsItem.url });
 		}}
 	>
 		<div class="thumb">
@@ -35,7 +35,7 @@
 			<b>{newsItem.title}</b>
 			<small>{newsItem.date}</small>
 		</div>
-	</a>
+	</div>
 {/if}
 
 <style>
@@ -52,8 +52,13 @@
 	.row:first-child {
 		border-top: 0;
 	}
-	a.row:hover {
+	.link {
+		cursor: pointer;
+	}
+	.link:hover,
+	.link:focus-visible {
 		background: var(--hov);
+		outline: none;
 	}
 	.thumb {
 		width: 64px;
