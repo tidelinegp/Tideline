@@ -16,13 +16,7 @@
 
 <header class="head">
 	<div class="brand">
-		<div class="mark" aria-hidden="true">
-			<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M3 8c2.2-1.9 4.3-1.9 6 0s3.8 1.9 6 0 3.8-1.9 6 0" />
-				<path d="M3 13c2.2-1.9 4.3-1.9 6 0s3.8 1.9 6 0 3.8-1.9 6 0" opacity="0.8" />
-				<path d="M3 18c2.2-1.9 4.3-1.9 6 0s3.8 1.9 6 0 3.8-1.9 6 0" opacity="0.55" />
-			</svg>
-		</div>
+		<img class="mark" src="tideline.svg" width="38" height="38" alt="" aria-hidden="true" />
 		<div>
 			<h1>{brand.name}</h1>
 			<small>{today}</small>
@@ -78,13 +72,10 @@
 		gap: 12px;
 	}
 	.mark {
-		width: 36px;
-		height: 36px;
-		border-radius: 10px;
-		background: linear-gradient(150deg, var(--g1), var(--g2) 62%, var(--accent2));
-		display: grid;
-		place-items: center;
-		color: var(--on-gold);
+		width: 38px;
+		height: 38px;
+		display: block;
+		flex: none;
 	}
 	h1 {
 		margin: 0;
