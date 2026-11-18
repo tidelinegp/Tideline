@@ -31,11 +31,20 @@ CloseApplications=yes
 RestartApplications=no
 UsePreviousAppDir=yes
 
+[Types]
+Name: "full"; Description: "Launcher and flipping dashboard"
+Name: "custom"; Description: "Choose what to install"; Flags: iscustom
+
+[Components]
+Name: "main"; Description: "Tideline launcher (multiple Jagex accounts)"; Types: full custom; Flags: fixed
+Name: "dashboard"; Description: "Flipping dashboard (prices, flip finder, profit tracking)"; Types: full
+
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
-Source: "stage\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "stage\*"; DestDir: "{app}"; Excludes: "web"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: main
+Source: "stage\web\*"; DestDir: "{app}\web"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: dashboard
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\tideline.exe"
