@@ -10,8 +10,8 @@ export const brand = {
 	licence: 'GNU Affero General Public License v3',
 	licenceUrl: 'https://www.gnu.org/licenses/agpl-3.0.html',
 	// where the source code of this version can be found; set once the public repository exists
-	sourceUrl: '' as string,
+	sourceUrl: 'https://github.com/tidelinegp/tideline' as string,
 	// where latest.json is published (the update check); empty until the release page exists
-	updateManifestUrl: '' as string,
+	updateManifestUrl: 'https://github.com/tidelinegp/tideline/releases/latest/download/latest.json' as string,
 	fanContentPolicyUrl: 'https://legal.jagex.com/docs/policies/fan-content-policy'
 };

@@ -33,7 +33,7 @@ The RS3 plugin loader from Bolt is not included in this build.
 
 ## Install
 
-Releases will be published on this repository's Releases page. Until then you can [build it yourself](#building-from-source).
+Download the latest installer from the [Releases page](https://github.com/tidelinegp/tideline/releases/latest) (`Tideline-Setup-<version>.exe`). Tideline checks for updates itself and installs them with one click. You can also [build it yourself](#building-from-source).
 
 Windows may show a SmartScreen warning because the build is not code-signed yet. Only download Tideline from this repository.
 
@@ -52,7 +52,7 @@ On first start Tideline looks for an existing Bolt data folder and copies your s
 You need Visual Studio 2022 (or Build Tools) with the C++ workload, CMake, Node.js, and a [CEF](https://adamcake.com/cef) binary distribution (Windows 64-bit, version 139). The steps below are what this project uses; see [BOLT-README.md](BOLT-README.md) for Bolt's own, more general build notes.
 
 ```bash
-git clone --recurse-submodules <this repository>
+git clone --recurse-submodules https://github.com/tidelinegp/tideline.git
 cd tideline
 
 # put your CEF distribution in cef/dist, then build the interface
