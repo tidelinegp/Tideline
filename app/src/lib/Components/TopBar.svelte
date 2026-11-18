@@ -1,86 +1,141 @@
 <script lang="ts">
-	import AccountDropdownContent from '$lib/Components/AccountDropdownContent.svelte';
-	import Dropdown from '$lib/Components/CommonUI/Dropdown.svelte';
-	import SettingsModal from './Modals/SettingsModal.svelte';
 	import { GlobalState } from '$lib/State/GlobalState';
 	import { Game } from '$lib/Util/Interfaces';
 
-	const { config, sessions, initialized } = GlobalState;
-	const subs = $derived(Object.keys($sessions));
-	const selectedSub = $derived($config.selected.user_id);
-	const selectedSession = $derived(selectedSub ? $sessions[selectedSub] : null);
-	
-	let {
-		openSettings = $bindable(),
-		logoutConfirm = $bindable(),
-	} = $props();
+	const { config, initialized } = GlobalState;
+
+	let { openSettings = $bindable() } = $props();
+
+	const today = new Date().toLocaleDateString(undefined, {
+		weekday: 'long',
+		month: 'long',
+		day: 'numeric'
+	});
 </script>
 
-<div
-	class="fixed top-0 flex h-16 w-screen border-b-2 border-slate-300 bg-slate-100 duration-200 dark:border-slate-800 dark:bg-slate-900"
->
-	<div class="m-3 ml-9 font-bold">
-		<button
-			class="mx-1 w-20 rounded-lg border-2 border-blue-500 p-1 duration-200 hover:opacity-75"
-			class:text-black={$config.selected.game === Game.rs3}
-			class:bg-blue-500={$config.selected.game === Game.rs3}
-			onclick={() => {
-				$config.selected.game = Game.rs3;
-			}}
-		>
-			RS3
-		</button>
-		<button
-			class="mx-1 w-20 rounded-lg border-2 border-blue-500 bg-blue-500 p-1 text-black duration-200 hover:opacity-75"
-			class:text-black={$config.selected.game === Game.osrs}
-			class:bg-blue-500={$config.selected.game === Game.osrs}
-			onclick={() => {
-				$config.selected.game = Game.osrs;
-			}}
-		>
-			OSRS
-		</button>
+<header class="head">
+	<div class="brand">
+		<div class="mark" aria-hidden="true">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 10-13h-6z" /></svg>
+		</div>
+		<div>
+			<h1>Bolt</h1>
+			<small>{today}</small>
+		</div>
 	</div>
-	<div class="m-2 ml-auto flex gap-2">
-		<button
-			class="h-10 w-10 rounded-full bg-blue-500 text-center duration-200 hover:rotate-45 hover:opacity-75"
-			onclick={() => ($config.use_dark_theme = !$config.use_dark_theme)}
-			disabled={!$initialized}
-		>
-			<img src="svgs/lightbulb-solid.svg" class="m-auto h-6 w-6" alt="Change Theme" />
-		</button>
-		<button
-			class="h-10 w-10 rounded-full bg-blue-500 text-center duration-200 hover:rotate-45 hover:opacity-75"
-			onclick={() => {console.log("b");openSettings();}}
-			disabled={!$initialized}
-		>
-			<img src="svgs/gear-solid.svg" class="m-auto h-6 w-6" alt="Settings" />
-		</button>
-		{#if subs.length > 0}
-			<Dropdown align="center">
-				<button
-					class="h-11 w-48 rounded-lg border-2 border-slate-300 bg-inherit text-center font-bold text-black duration-200 hover:opacity-75 dark:border-slate-800 dark:text-slate-50"
-					disabled={!$initialized}
-				>
-					{selectedSession?.displayName ?? 'No user selected'}
-				</button>
-
-				{#snippet content()}
-					<div class="w-40">
-						<AccountDropdownContent bind:logoutConfirm />
-					</div>
-				{/snippet}
-			</Dropdown>
-		{:else}
+	<span class="spacer"></span>
+	<div class="tools">
+		<div class="seg" role="group" aria-label="Game">
 			<button
-				class="h-11 w-48 rounded-lg border-2 border-slate-300 bg-inherit p-2 text-center font-bold text-black duration-200 hover:opacity-75 dark:border-slate-800 dark:text-slate-50"
-				onclick={() => fetch('/login')}
-				disabled={!$initialized}
+				type="button"
+				aria-pressed={$config.selected.game === Game.rs3}
+				onclick={() => ($config.selected.game = Game.rs3)}>RS3</button
 			>
-				{#if $initialized}
-					{'Login'}
-				{/if}
-			</button>
-		{/if}
+			<button
+				type="button"
+				aria-pressed={$config.selected.game === Game.osrs}
+				onclick={() => ($config.selected.game = Game.osrs)}>OSRS</button
+			>
+		</div>
+		<button
+			class="ghost"
+			type="button"
+			disabled={!$initialized}
+			onclick={() => ($config.use_dark_theme = !$config.use_dark_theme)}
+		>
+			{$config.use_dark_theme ? 'Light' : 'Dark'}
+		</button>
+		<button class="ghost" type="button" disabled={!$initialized} onclick={() => openSettings()}>
+			Settings
+		</button>
 	</div>
-</div>
+</header>
+
+<style>
+	/* the whole header row, including its padding, drags the frameless window; buttons opt out */
+	.head {
+		display: flex;
+		align-items: flex-start;
+		gap: 14px;
+		flex-wrap: wrap;
+		margin: 0 -28px;
+		padding: 22px 28px 0;
+		-webkit-app-region: drag;
+	}
+	.tools {
+		-webkit-app-region: no-drag;
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	.mark {
+		width: 36px;
+		height: 36px;
+		border-radius: 10px;
+		background: linear-gradient(160deg, var(--g1), var(--g2));
+		display: grid;
+		place-items: center;
+		color: var(--on-gold);
+	}
+	h1 {
+		margin: 0;
+		font: 700 26px var(--disp);
+		letter-spacing: -0.03em;
+		line-height: 1;
+	}
+	small {
+		display: block;
+		color: var(--mut);
+		font-size: 13px;
+		margin-top: 3px;
+	}
+	.spacer {
+		flex: 1;
+	}
+	.tools {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+	.seg {
+		display: inline-flex;
+		background: var(--s2);
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		padding: 3px;
+	}
+	.seg button {
+		background: none;
+		border: 0;
+		color: var(--mut);
+		font: 650 13px var(--body);
+		padding: 7px 16px;
+		border-radius: 9px;
+		cursor: pointer;
+	}
+	.seg button[aria-pressed='true'] {
+		background: linear-gradient(90deg, rgba(240, 193, 75, 0.2), rgba(240, 193, 75, 0.06));
+		color: var(--gold);
+		box-shadow: inset 0 0 0 1px rgba(240, 193, 75, 0.35);
+	}
+	.ghost {
+		background: var(--s2);
+		border: 1px solid var(--line);
+		color: var(--mut);
+		border-radius: 10px;
+		padding: 8px 13px;
+		font: 600 13px var(--body);
+		cursor: pointer;
+	}
+	.ghost:hover:not(:disabled) {
+		color: var(--txt);
+		border-color: var(--inpb);
+	}
+	button:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 3px rgba(240, 193, 75, 0.3);
+	}
+</style>

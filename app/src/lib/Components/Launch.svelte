@@ -17,14 +17,16 @@
 		selectedUserId ? $config.userDetails[selectedUserId]?.account_id : null
 	);
 	let session = $derived(selectedUserId ? $sessions[selectedUserId] : null);
-	let characterIds = $derived(session ? Object.keys(session.characters) : null);
+	let selectedCharacter = $derived(
+		session && selectedCharacterId ? session.characters[selectedCharacterId] : null
+	);
 
 	// messages about game downtime, retrieved from game server
 	let {
 		osrsPsa = $bindable(),
 		rs3Psa = $bindable(),
 		launchConfirm = $bindable(),
-		openPluginMenu = $bindable(),
+		openPluginMenu = $bindable()
 	} = $props();
 	const PSA_FETCH_INTERVAL_MS = 60_000;
 	let psaFetchedAt: number = 0;
@@ -113,82 +115,167 @@
 		}
 	}
 
-	function handleAccountChange() {
-		if (!selectedUserId) return;
-		if (selectedCharacterId) {
-			$config.userDetails[selectedUserId] = { account_id: selectedCharacterId };
+	// the Play button, also called by the account sidebar after it selects a character
+	export function play(): void {
+		if (gameEnabled) {
+			launch($config.selected.game, $config.selected.client);
 		} else {
-			delete $config.userDetails[selectedUserId];
+			launchConfirm(launch, $config.selected.game, $config.selected.client);
 		}
 	}
 </script>
 
-<div class="bg-grad flex h-full flex-col border-slate-300 pt-5 duration-200 dark:border-slate-800">
-	<div class="flex flex-col items-center gap-4">
-		<img
-			src="svgs/rocket-solid.svg"
-			alt="Launch icon"
-			class="mb-3 w-24 rounded-3xl bg-gradient-to-br from-rose-500 to-violet-500 p-5"
-		/>
-		<button
-			class="w-52 rounded-lg bg-emerald-500 p-2 font-bold text-black duration-200 enabled:hover:opacity-75 disabled:bg-gray-500"
-			disabled={!$initialized}
-			onclick={() => {
-				if (gameEnabled) {
-					launch($config.selected.game, $config.selected.client);
-				} else {
-					launchConfirm(launch, $config.selected.game, $config.selected.client);
-				}
-			}}
-		>
+<section class="hero" aria-label="Ready to play">
+	<div class="info">
+		<div class="eyebrow">{selectedCharacter ? 'Ready to play' : 'Pick a character'}</div>
+		<h2>
+			{selectedCharacter?.displayName ||
+				(Object.keys($sessions).length > 0 ? 'Choose a character' : 'Log in to start')}
+		</h2>
+		<div class="acct-line">
+			{session ? `Jagex account ${session.displayName}` : 'Add a Jagex account in the sidebar'}
+		</div>
+		<div class="facts">
+			{#if $config.selected.game == Game.osrs}
+				<div>
+					<small>Game client</small>
+					<select aria-label="Game client" bind:value={$config.selected.client}>
+						{#each clientMap[$config.selected.game] as client}
+							<option value={client}>{client}</option>
+						{/each}
+					</select>
+				</div>
+			{:else if $config.selected.game === Game.rs3}
+				<div>
+					<small>RS3 plugins</small>
+					<button
+						class="plug"
+						type="button"
+						disabled={!bolt.hasBoltPlugins}
+						title={bolt.hasBoltPlugins ? null : 'This feature is disabled'}
+						onclick={openPluginMenu}
+					>
+						Plugin menu
+					</button>
+				</div>
+			{/if}
+		</div>
+	</div>
+	<div class="playcol">
+		<button class="play" type="button" disabled={!$initialized || !selectedCharacter} onclick={play}>
 			Play
 		</button>
-		{#if $config.selected.game == Game.osrs}
-			<label class="flex flex-col">
-				<span class="text-sm">Game Client</span>
-				<select
-					class="w-52 cursor-pointer rounded-lg border-2 border-slate-300 bg-inherit p-2 text-inherit duration-200 hover:opacity-75 dark:border-slate-800"
-					bind:value={$config.selected.client}
-				>
-					{#each clientMap[$config.selected.game] as client}
-						<option class="dark:bg-slate-900" value={client}>{client}</option>
-					{/each}
-				</select>
-			</label>
-		{:else if $config.selected.game === Game.rs3}
-			<button
-				disabled={!bolt.hasBoltPlugins}
-				title={bolt.hasBoltPlugins ? null : 'This feature is disabled'}
-				class="w-52 rounded-lg p-2 font-bold text-black duration-200 enabled:bg-blue-500 enabled:hover:opacity-75 disabled:bg-gray-500"
-				onclick={openPluginMenu}
-			>
-				Plugin menu
-			</button>
-		{/if}
-		<label class="flex flex-col">
-			<span class="text-sm">Character</span>
-			<select
-				class="mx-auto w-52 cursor-pointer rounded-lg border-2 border-slate-300 bg-inherit p-2 text-inherit duration-200 hover:opacity-75 dark:border-slate-800"
-				disabled={!$initialized || $config.selected.user_id === null}
-				bind:value={selectedCharacterId}
-				onchange={handleAccountChange}
-			>
-				<option value={undefined} disabled class="dark:bg-slate-900">Select an account</option>
-				{#if session && characterIds && characterIds.length > 0}
-					{#each characterIds as characterId}
-						{@const character = session.characters[characterId]}
-						<option value={characterId} class="dark:bg-slate-900">
-							{#if character.displayName}
-								{character.displayName}
-							{:else}
-								New Character
-							{/if}
-						</option>
-					{/each}
-				{:else}
-					<option class="dark:bg-slate-900" disabled selected>No characters</option>
-				{/if}
-			</select>
-		</label>
 	</div>
-</div>
+</section>
+
+<style>
+	.hero {
+		position: relative;
+		background: linear-gradient(180deg, var(--s1), var(--s2));
+		border: 1px solid var(--line);
+		border-radius: var(--r);
+		padding: 26px 28px;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 22px;
+		align-items: center;
+		overflow: hidden;
+	}
+	.hero::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 0;
+		right: 0;
+		height: 2px;
+		background: linear-gradient(90deg, var(--gold), transparent);
+	}
+	.eyebrow {
+		letter-spacing: 0.16em;
+		font-size: 11px;
+		font-weight: 700;
+		color: var(--gold);
+		text-transform: uppercase;
+	}
+	h2 {
+		margin: 8px 0 4px;
+		font: 800 clamp(30px, 5vw, 54px) var(--disp);
+		letter-spacing: -0.04em;
+		line-height: 1.05;
+		overflow-wrap: anywhere;
+	}
+	.acct-line {
+		color: var(--mut);
+		font-size: 15px;
+	}
+	.facts {
+		display: flex;
+		gap: 22px;
+		flex-wrap: wrap;
+		margin-top: 20px;
+	}
+	.facts > div {
+		border-left: 2px solid var(--gold);
+		padding: 2px 0 2px 11px;
+		min-width: 0;
+	}
+	.facts small {
+		display: block;
+		color: var(--mut);
+		font-size: 12px;
+	}
+	select {
+		background: var(--inp);
+		color: var(--txt);
+		border: 1px solid var(--inpb);
+		border-radius: 9px;
+		padding: 6px 10px;
+		font: 650 14px var(--body);
+		margin-top: 2px;
+		cursor: pointer;
+	}
+	select option {
+		background: var(--s1);
+		color: var(--txt);
+	}
+	.plug {
+		background: var(--inp);
+		color: var(--txt);
+		border: 1px solid var(--inpb);
+		border-radius: 9px;
+		padding: 6px 12px;
+		font: 650 14px var(--body);
+		margin-top: 2px;
+		cursor: pointer;
+	}
+	.plug:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.play {
+		background: linear-gradient(90deg, var(--g2), var(--g1));
+		color: var(--on-gold);
+		border: 0;
+		border-radius: 14px;
+		font: 800 20px var(--disp);
+		letter-spacing: -0.01em;
+		padding: 18px 44px;
+		cursor: pointer;
+	}
+	.play:hover:not(:disabled) {
+		filter: brightness(1.07);
+	}
+	.play:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	:is(button, select):focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 3px rgba(240, 193, 75, 0.3);
+	}
+	@media (max-width: 760px) {
+		.hero {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

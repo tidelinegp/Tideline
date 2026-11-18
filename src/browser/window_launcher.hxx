@@ -7,10 +7,16 @@
 #include <filesystem>
 
 namespace Browser {
-	struct Launcher: public Window, CefRequestHandler {
+	struct Launcher: public Window, CefRequestHandler, CefDragHandler {
 		Launcher(CefRefPtr<Browser::Client>, Details, bool, CefRefPtr<FileManager::FileManager>, std::filesystem::path, std::filesystem::path, CefRefPtr<CefListValue>);
 
 		CefRefPtr<CefRequestHandler> GetRequestHandler() override;
+
+		/// The launcher window is frameless, so the web UI marks its own draggable title area
+		/// (-webkit-app-region: drag) and this handler passes those regions on to the window.
+		CefRefPtr<CefDragHandler> GetDragHandler() override;
+		void OnDraggableRegionsChanged(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, const std::vector<CefDraggableRegion>&) override;
+
 		CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(
 			CefRefPtr<CefBrowser>,
 			CefRefPtr<CefFrame>,
@@ -113,6 +119,8 @@ namespace Browser {
 		CefRefPtr<CefResourceRequestHandler> JarFilePicker(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 		CefRefPtr<CefResourceRequestHandler> JsonFilePicker(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 		CefRefPtr<CefResourceRequestHandler> Close(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> Minimize(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> ToggleMaximize(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 
 #if defined(BOLT_PLUGINS)
 		CefRefPtr<CefResourceRequestHandler> SavePluginConfig(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);

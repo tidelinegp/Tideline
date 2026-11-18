@@ -36,6 +36,32 @@
 #define URLPLATFORM "mac"
 #endif
 
+// window controls for the frameless launcher window; CefWindow must be used from the UI thread
+struct WindowControlTask: public CefTask {
+	enum class Action { Minimize, ToggleMaximize };
+	WindowControlTask(CefRefPtr<CefWindow> window, Action action): window(window), action(action) {}
+	void Execute() override {
+		if (!window) return;
+		switch (action) {
+			case Action::Minimize:
+				window->Minimize();
+				break;
+			case Action::ToggleMaximize:
+				if (window->IsMaximized()) {
+					window->Restore();
+				} else {
+					window->Maximize();
+				}
+				break;
+		}
+	}
+	private:
+		CefRefPtr<CefWindow> window;
+		Action action;
+		IMPLEMENT_REFCOUNTING(WindowControlTask);
+		DISALLOW_COPY_AND_ASSIGN(WindowControlTask);
+};
+
 struct OpenLoginWindowTask: public CefTask {
 	OpenLoginWindowTask(CefRefPtr<Browser::Client> client): client(client) {}
 	void Execute() override { client->OpenLoginWindow(); }
@@ -288,6 +314,8 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 		ROUTE("jar-file-picker", JarFilePicker)
 		ROUTE("json-file-picker", JsonFilePicker)
 		ROUTE("close", Close)
+		ROUTE("minimize", Minimize)
+		ROUTE("toggle-maximize", ToggleMaximize)
 		ROUTEIFPLUGINS("save-plugin-config", SavePluginConfig)
 		ROUTEIFPLUGINS("list-game-clients", ListGameClients)
 		ROUTEIFPLUGINS("read-json-file", ReadJsonFile)
@@ -519,6 +547,26 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::JsonFilePicker(CefRefPtr
 CefRefPtr<CefResourceRequestHandler> Browser::Launcher::Close(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
 	browser->GetHost()->CloseBrowser(false);
 	QSENDOK();
+}
+
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::Minimize(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
+	CefPostTask(TID_UI, new WindowControlTask(this->window, WindowControlTask::Action::Minimize));
+	QSENDOK();
+}
+
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::ToggleMaximize(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
+	CefPostTask(TID_UI, new WindowControlTask(this->window, WindowControlTask::Action::ToggleMaximize));
+	QSENDOK();
+}
+
+CefRefPtr<CefDragHandler> Browser::Launcher::GetDragHandler() {
+	return this;
+}
+
+void Browser::Launcher::OnDraggableRegionsChanged(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, const std::vector<CefDraggableRegion>& regions) {
+	if (this->window) {
+		this->window->SetDraggableRegions(regions);
+	}
 }
 
 

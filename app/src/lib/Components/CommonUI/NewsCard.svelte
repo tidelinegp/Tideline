@@ -10,51 +10,89 @@
 	export let loading: boolean = false;
 </script>
 
-<div>
-	{#if loading}
-		<div
-			class="news-card block cursor-pointer overflow-hidden rounded-lg border border-slate-300 bg-transparent p-3 shadow-md duration-200 dark:border-slate-800 dark:bg-slate-900"
-			style="aspect-ratio: 1 / 1;"
-		>
-			<div class="flex h-full flex-col">
-				<div
-					class="mb-2 h-5 w-3/4 animate-pulse rounded bg-slate-300/40 dark:bg-slate-800/40"
-				></div>
-				<div
-					class="mb-2 h-1/2 w-full animate-pulse rounded bg-slate-300/40 dark:bg-slate-800/40"
-				></div>
-				<div class="mt-auto">
-					<div class="h-4 w-1/3 animate-pulse rounded bg-slate-300/40 dark:bg-slate-800/40"></div>
-				</div>
-			</div>
+{#if loading}
+	<div class="row skeleton">
+		<div class="thumb"></div>
+		<div class="text"><div class="bar w"></div><div class="bar n"></div></div>
+	</div>
+{:else if newsItem}
+	<a
+		class="row"
+		href={newsItem.url}
+		target="_blank"
+		rel="noopener noreferrer"
+		onclick={(evt) => {
+			evt.preventDefault();
+			fetch('/open-external-url', { method: 'POST', body: newsItem.url });
+		}}
+	>
+		<div class="thumb">
+			{#if newsItem.imageUrl}
+				<img src={newsItem.imageUrl} alt="" />
+			{/if}
 		</div>
-	{:else if newsItem}
-		<a
-			href={newsItem.url}
-			target="_blank"
-			rel="noopener noreferrer"
-			class="news-card block cursor-pointer overflow-hidden rounded-lg border border-slate-300 bg-slate-100 p-3 shadow-md duration-200 hover:opacity-75 dark:border-slate-800 dark:bg-slate-900"
-			style="aspect-ratio: 1 / 1;"
-			onclick={(evt) => {
-				evt.preventDefault();
-				fetch('/open-external-url', { method: 'POST', body: newsItem.url });
-			}}
-		>
-			<div class="flex h-full flex-col">
-				<h2
-					class="text-md mb-2 overflow-hidden font-semibold leading-tight text-slate-900 dark:text-slate-100"
-					style="max-height:30%;"
-				>
-					{newsItem.title}
-				</h2>
-				<div class="flex-1"></div>
-				<div class="mb-2 w-full overflow-hidden rounded" style="height:50%;">
-					<img src={newsItem.imageUrl} alt={newsItem.title} class="h-full w-full object-cover" />
-				</div>
-				<div>
-					<p class="text-sm text-slate-600 dark:text-slate-400">{newsItem.date}</p>
-				</div>
-			</div>
-		</a>
-	{/if}
-</div>
+		<div class="text">
+			<b>{newsItem.title}</b>
+			<small>{newsItem.date}</small>
+		</div>
+	</a>
+{/if}
+
+<style>
+	.row {
+		display: grid;
+		grid-template-columns: 64px minmax(0, 1fr);
+		gap: 14px;
+		align-items: center;
+		padding: 10px 14px;
+		border-top: 1px solid var(--line);
+		color: var(--txt);
+		text-decoration: none;
+	}
+	.row:first-child {
+		border-top: 0;
+	}
+	a.row:hover {
+		background: var(--hov);
+	}
+	.thumb {
+		width: 64px;
+		height: 44px;
+		border-radius: 8px;
+		overflow: hidden;
+		background: var(--inp);
+		border: 1px solid var(--inpb);
+	}
+	.thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.text {
+		min-width: 0;
+	}
+	b {
+		display: block;
+		font: 650 14.5px var(--body);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	small {
+		color: var(--mut);
+		font-size: 12.5px;
+	}
+	.bar {
+		height: 12px;
+		border-radius: 6px;
+		background: var(--inp);
+		margin: 5px 0;
+	}
+	.bar.w {
+		width: 70%;
+	}
+	.bar.n {
+		width: 30%;
+	}
+</style>

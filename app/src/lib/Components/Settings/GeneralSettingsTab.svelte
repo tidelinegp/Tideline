@@ -26,47 +26,101 @@
 		'Enable fetching RSS feeds for news and updates. Disabling this will reduce the number of web requests made when opening the launcher.';
 </script>
 
-<div class="mx-auto p-2" title={checkAnnouncementsDesc}>
-	<label for="check_announcements">Check game announcements: </label>
-	<input
-		id="check_announcements"
-		type="checkbox"
-		bind:checked={$config.check_announcements}
-		class="ml-2"
-	/>
-</div>
-<div class="mx-auto p-2" title={fetchRssFeedsDesc}>
-	<label for="fetch_rss_feeds">Fetch RSS feeds: </label>
-	<input id="fetch_rss_feeds" type="checkbox" bind:checked={$config.fetch_rss_feeds} class="ml-2" />
-</div>
-<div class="mx-auto p-2" title={closeAfterLaunchDesc}>
-	<label for="close_after_launch">Close Bolt after launching a game: </label>
-	<input
-		id="close_after_launch"
-		type="checkbox"
-		bind:checked={$config.close_after_launch}
-		class="ml-2"
-	/>
-</div>
-<div class="mx-auto p-2" title={discardExpiredLoginsDesc}>
-	<label for="discard_expired_logins">Discard expired login sessions: </label>
-	<input
-		id="discard_expired_logins"
-		type="checkbox"
-		bind:checked={$config.discard_expired_sessions}
-		class="ml-2"
-	/>
-</div>
-<br />
-<div class="mx-auto p-2">
-	Bolt Version: {bolt.boltVersion}
-</div>
-<button
-	class="p-2 mb-5 rounded-lg text-black text-sm bg-blue-500 opacity-50 enabled:cursor-pointer enabled:duration-200 enabled:opacity-100 enabled:hover:opacity-75"
-	onclick={openDataDir}
->
-	<div class="flex">
-		<img src="svgs/external-link.svg" alt="Configure RuneLite" class="mr-2 w-4 h-4" />
-		Browse App Data
+<div class="set">
+	<h3>General</h3>
+
+	<label class="opt" title={checkAnnouncementsDesc}>
+		<input id="check_announcements" type="checkbox" bind:checked={$config.check_announcements} />
+		<span>
+			<b>Check game announcements</b>
+			<small>Show official game status messages in the launcher.</small>
+		</span>
+	</label>
+	<label class="opt" title={fetchRssFeedsDesc}>
+		<input id="fetch_rss_feeds" type="checkbox" bind:checked={$config.fetch_rss_feeds} />
+		<span>
+			<b>Fetch news feeds</b>
+			<small>Load the latest news on the home screen.</small>
+		</span>
+	</label>
+	<label class="opt" title={closeAfterLaunchDesc}>
+		<input id="close_after_launch" type="checkbox" bind:checked={$config.close_after_launch} />
+		<span>
+			<b>Close Bolt after launching a game</b>
+			<small>Quit the launcher as soon as a client starts.</small>
+		</span>
+	</label>
+	<label class="opt" title={discardExpiredLoginsDesc}>
+		<input
+			id="discard_expired_logins"
+			type="checkbox"
+			bind:checked={$config.discard_expired_sessions}
+		/>
+		<span>
+			<b>Discard expired login sessions</b>
+			<small>Ask you to sign in again when a saved login stops working.</small>
+		</span>
+	</label>
+
+	<div class="foot">
+		<span class="ver">Bolt version {bolt.boltVersion}</span>
+		<button class="ghost" type="button" onclick={openDataDir}>Browse app data</button>
 	</div>
-</button>
+</div>
+
+<style>
+	h3 {
+		margin: 0 0 14px;
+		font: 700 22px var(--disp);
+		letter-spacing: -0.02em;
+	}
+	.opt {
+		display: flex;
+		gap: 14px;
+		align-items: flex-start;
+		padding: 12px 14px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--s2);
+		margin-bottom: 8px;
+		cursor: pointer;
+	}
+	.opt:hover {
+		border-color: var(--inpb);
+	}
+	.opt input {
+		margin-top: 3px;
+	}
+	.opt b {
+		display: block;
+		font: 650 14.5px var(--body);
+	}
+	.opt small {
+		color: var(--mut);
+		font-size: 12.5px;
+	}
+	.foot {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin-top: 18px;
+	}
+	.ver {
+		color: var(--mut);
+		font-size: 13px;
+		margin-right: auto;
+	}
+	.ghost {
+		background: var(--inp);
+		border: 1px solid var(--inpb);
+		color: var(--txt);
+		border-radius: 10px;
+		padding: 8px 14px;
+		font: 600 13px var(--body);
+		cursor: pointer;
+	}
+	.ghost:hover {
+		border-color: var(--gold);
+		color: var(--gold);
+	}
+</style>

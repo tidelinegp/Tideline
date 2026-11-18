@@ -13,12 +13,13 @@
 	}
 
 	let modal: Modal;
+	let openTab: Tab = $state(Tab.general);
 
-	// variables for swapping options and styling
-	let openTab: Tab = Tab.general;
-	let activeClass =
-		'border-2 border-blue-500 bg-blue-500 hover:opacity-75 font-bold text-black duration-200 rounded-lg p-1 w-3/4';
-	let inactiveClass = 'border-2 border-blue-500 hover:opacity-75 duration-200 rounded-lg p-1 w-3/4';
+	const tabs = [
+		{ id: Tab.general, label: 'General' },
+		{ id: Tab.osrs, label: 'OSRS' },
+		{ id: Tab.rs3, label: 'RS3' }
+	];
 
 	export function open() {
 		modal.open();
@@ -27,32 +28,18 @@
 	const close = () => saveConfig();
 </script>
 
-<Modal bind:this={modal} class="h-3/4 w-3/4 select-none border-2 border-solid border-black" onClose={close}>
-	<div class="grid h-full grid-cols-4">
-		<div
-			class="flex flex-col items-center gap-2 border-r-2 border-slate-300 pt-10 dark:border-slate-800"
-		>
-			<button
-				class={openTab === Tab.general ? activeClass : inactiveClass}
-				onclick={() => {
-					openTab = Tab.general;
-				}}>General</button
-			>
-			<button
-				class={openTab === Tab.osrs ? activeClass : inactiveClass}
-				onclick={() => {
-					openTab = Tab.osrs;
-				}}>OSRS</button
-			>
-			<button
-				class={openTab === Tab.rs3 ? activeClass : inactiveClass}
-				onclick={() => {
-					openTab = Tab.rs3;
-				}}>RS3</button
-			>
-		</div>
+<Modal bind:this={modal} class="settings select-none" onClose={close}>
+	<div class="wrap">
+		<nav class="tabs" aria-label="Settings sections">
+			<h2>Settings</h2>
+			{#each tabs as tab}
+				<button type="button" aria-current={openTab === tab.id} onclick={() => (openTab = tab.id)}>
+					{tab.label}
+				</button>
+			{/each}
+		</nav>
 
-		<div class="col-span-3 p-5 pt-10 text-center">
+		<div class="content">
 			{#if openTab == Tab.general}
 				<GeneralSettingsTab />
 			{:else if openTab == Tab.osrs}
@@ -63,3 +50,51 @@
 		</div>
 	</div>
 </Modal>
+
+<style>
+	:global(dialog.settings) {
+		width: min(720px, 90%);
+		height: min(520px, 90%);
+	}
+	.wrap {
+		display: grid;
+		grid-template-columns: 190px minmax(0, 1fr);
+		height: 100%;
+	}
+	.tabs {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 22px 14px;
+		border-right: 1px solid var(--line);
+		background: color-mix(in srgb, var(--side) 70%, transparent);
+	}
+	h2 {
+		margin: 0 8px 14px;
+		font: 700 19px var(--disp);
+		letter-spacing: -0.02em;
+	}
+	.tabs button {
+		text-align: left;
+		background: none;
+		border: 0;
+		border-radius: 10px;
+		padding: 10px 12px;
+		color: var(--txt);
+		font: 600 14px var(--body);
+		cursor: pointer;
+	}
+	.tabs button:hover {
+		background: var(--hov);
+	}
+	.tabs button[aria-current='true'] {
+		background: linear-gradient(90deg, rgba(240, 193, 75, 0.18), rgba(240, 193, 75, 0.04));
+		color: var(--gold);
+		box-shadow: inset 2px 0 0 var(--gold);
+	}
+	.content {
+		padding: 26px 28px;
+		overflow-y: auto;
+		text-align: left;
+	}
+</style>

@@ -1,3 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Design tokens for the redesigned launcher. Light values first, dark values under .dark (set by MainLayout). */
+.bolt-root {
+	--bg: #eef1f7;
+	--side: #f6f8fc;
+	--s1: #ffffff;
+	--s2: #f4f6fb;
+	--hov: #eaeff9;
+	--inp: #eef2fa;
+	--inpb: #cfd7e8;
+	--line: #d8deea;
+	--txt: #151b29;
+	--mut: #5d6a84;
+	--gold: #b4800c;
+	--g1: #f0c14b;
+	--g2: #d9a22e;
+	--pos: #15803d;
+	--on-gold: #2a1d02;
+	--glow1: rgba(240, 193, 75, 0.18);
+	--glow2: rgba(31, 111, 229, 0.08);
+	--disp: 'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
+	--body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--r: 14px;
+}
+.bolt-root.dark {
+	--bg: #0b0e14;
+	--side: #0e121a;
+	--s1: #171d28;
+	--s2: #131822;
+	--hov: #1a2132;
+	--inp: #1b2232;
+	--inpb: #2c3548;
+	--line: #232b3a;
+	--txt: #e8ebf2;
+	--mut: #8a94a8;
+	--gold: #f0c14b;
+	--g1: #f6cd62;
+	--g2: #dba935;
+	--pos: #4ade80;
+	--on-gold: #1c1503;
+	--glow1: rgba(240, 193, 75, 0.075);
+	--glow2: rgba(108, 178, 255, 0.05);
+}
+
+/* thin themed scrollbars everywhere */
+.bolt-root,
+.bolt-root * {
+	scrollbar-width: thin;
+	scrollbar-color: var(--inpb) transparent;
+}
+.bolt-root ::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+.bolt-root ::-webkit-scrollbar-track {
+	background: transparent;
+}
+.bolt-root ::-webkit-scrollbar-thumb {
+	background: var(--inpb);
+	border-radius: 10px;
+	border: 3px solid transparent;
+	background-clip: content-box;
+}
+.bolt-root ::-webkit-scrollbar-thumb:hover {
+	background: var(--mut);
+	background-clip: content-box;
+}
+
+/* form controls inside dialogs (settings, confirmations) */
+.bolt-dialog input[type='checkbox'] {
+	accent-color: var(--gold);
+	width: 16px;
+	height: 16px;
+	flex: none;
+}
+.bolt-dialog textarea,
+.bolt-dialog select,
+.bolt-dialog input[type='text'] {
+	background: var(--inp) !important;
+	color: var(--txt) !important;
+	border: 1px solid var(--inpb) !important;
+	border-radius: 10px !important;
+	padding: 6px 10px;
+	font-family: var(--body);
+}
+.bolt-dialog textarea:focus-visible,
+.bolt-dialog select:focus-visible {
+	outline: none;
+	border-color: var(--gold) !important;
+	box-shadow: 0 0 0 3px rgba(240, 193, 75, 0.2);
+}
+/* older tailwind-styled buttons in dialogs: blue buttons become quiet outlines, green ones become the gold primary */
+.bolt-dialog .bg-blue-500,
+.bolt-dialog .border-blue-500 {
+	background: var(--inp) !important;
+	color: var(--txt) !important;
+	border: 1px solid var(--inpb) !important;
+	border-radius: 10px !important;
+}
+.bolt-dialog .bg-blue-500:hover:not(:disabled),
+.bolt-dialog .border-blue-500:hover:not(:disabled) {
+	border-color: var(--gold) !important;
+	color: var(--gold) !important;
+	opacity: 1;
+}
+.bolt-dialog .bg-emerald-500 {
+	background: linear-gradient(90deg, var(--g2), var(--g1)) !important;
+	color: var(--on-gold) !important;
+	border-radius: 10px !important;
+}
+.bolt-dialog button:disabled {
+	opacity: 0.5;
+}
+.bolt-dialog h2 {
+	font-family: var(--disp);
+	letter-spacing: -0.02em;
+}

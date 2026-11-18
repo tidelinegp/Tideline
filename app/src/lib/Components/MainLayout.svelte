@@ -10,9 +10,17 @@
 	let darkTheme = $derived($config.use_dark_theme);
 </script>
 
-<main
-	class:dark={darkTheme}
-	class="fixed top-0 h-screen w-screen bg-slate-100 text-xs text-slate-900 duration-200 sm:text-sm md:text-base dark:bg-slate-900 dark:text-slate-50"
->
+<main class:dark={darkTheme} class="bolt-root fixed top-0 h-screen w-screen text-sm">
 	{@render children?.()}
 </main>
+
+<style>
+	main {
+		background:
+			radial-gradient(900px 420px at 18% -10%, var(--glow1), transparent 70%),
+			radial-gradient(700px 400px at 90% 110%, var(--glow2), transparent 70%), var(--bg);
+		color: var(--txt);
+		font-family: var(--body);
+		border: 1px solid var(--line);
+	}
+</style>

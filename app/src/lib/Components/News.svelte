@@ -104,7 +104,7 @@
 	});
 </script>
 
-<div class="no-scrollbar max-h-[calc(80vh-6rem)] min-h-0 overflow-auto p-4">
+<div class="min-h-0">
 	{#if osrsPsa && $config.selected.game === Game.osrs}
 		<div class={psaClass}>
 			{osrsPsa}
@@ -114,11 +114,10 @@
 			{rs3Psa}
 		</div>
 	{/if}
-	<div
-		class="grid auto-rows-fr grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-	>
+	<div class="sec-h"><h3>News</h3></div>
+	<div>
 		{#if loading}
-			{#each Array(8)}
+			{#each Array(6)}
 				<NewsCard loading={true} newsItem={undefined} />
 			{/each}
 		{:else}
@@ -130,13 +129,13 @@
 </div>
 
 <style>
-	/* Hide scrollbar for Chrome, Safari and Opera */
-	.no-scrollbar::-webkit-scrollbar {
-		display: none;
+	.sec-h {
+		padding: 14px 14px 8px;
+		border-bottom: 1px solid var(--line);
 	}
-	/* Hide scrollbar for IE, Edge and Firefox */
-	.no-scrollbar {
-		-ms-overflow-style: none; /* IE and Edge */
-		scrollbar-width: none; /* Firefox */
+	.sec-h h3 {
+		margin: 0;
+		font: 650 17px var(--disp);
+		letter-spacing: -0.01em;
 	}
 </style>

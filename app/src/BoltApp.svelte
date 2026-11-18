@@ -5,12 +5,13 @@
 	import MainLayout from '$lib/Components/MainLayout.svelte';
 	import TopBar from '$lib/Components/TopBar.svelte';
 	import News from '$lib/Components/News.svelte';
+	import AccountSidebar from '$lib/Components/AccountSidebar.svelte';
 	import { logger } from '$lib/Util/Logger';
 	import { GlobalState } from '$lib/State/GlobalState';
 	import { Client, Game, type Session } from '$lib/Util/Interfaces';
 	import LaunchConfirmModal from '$lib/Components/Modals/LaunchConfirmModal.svelte';
 	import PluginModal from '$lib/Components/Modals/PluginModal.svelte';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import LogoutConfirmModal from '$lib/Components/Modals/LogoutConfirmModal.svelte';
 	import SettingsModal from '$lib/Components/Modals/SettingsModal.svelte';
 	import { bolt } from '$lib/State/Bolt';
@@ -25,6 +26,7 @@
 	let logoutConfirmModal: LogoutConfirmModal;
 	let settingsModal: SettingsModal;
 	let pluginModal: PluginModal;
+	let launchPanel: Launch;
 
 	let launchConfirm = (launch: (game: Game, client: Client) => void, game: Game, client: Client) => launchConfirmModal.open(launch, game, client);
 	let logoutConfirm = (sub: string, session: Session) => (logoutConfirmModal.open(sub, session))
@@ -33,21 +35,16 @@
 	let showDisclaimer = () => (disclaimerModal.open());
 	if (isNew) onMount(showDisclaimer);
 
-	const mainClass = 'mt-16 grid h-full grid-flow-col grid-cols-2 sm:grid-cols-3';
-	const mainClassNoNews = 'mt-16 grid h-full grid-flow-col grid-cols-3';
+	// called by the account sidebar: the character is already selected in config, wait for the
+	// launch panel's derived values to catch up and then press Play for it
+	const launchCharacter = async (_sub: string, _characterId: string) => {
+		await tick();
+		launchPanel.play();
+	};
+
 	const psaClass =
 		'mb-5 w-full animate-pulse rounded border border-amber-500 bg-slate-100 p-2 shadow-md duration-200 dark:bg-slate-900';
 </script>
-
-{#snippet launch()}
-	<Launch bind:osrsPsa bind:rs3Psa bind:launchConfirm bind:openPluginMenu></Launch>
-{/snippet}
-
-{#snippet launchMid()}
-	<div class="col-span-1 col-start-2">
-		{@render launch()}
-	</div>
-{/snippet}
 
 <MainLayout>
 	<DisclaimerModal bind:this={disclaimerModal} />
@@ -58,31 +55,53 @@
 		<PluginModal bind:this={pluginModal}></PluginModal>
 	{/if}
 
-	<TopBar bind:logoutConfirm bind:openSettings />
-	<div class={$config.fetch_rss_feeds ? mainClass : mainClassNoNews}>
-		{#if $config.fetch_rss_feeds}
-			<div class="col-span-1 sm:col-span-2">
-				<News bind:osrsPsa bind:rs3Psa />
-			</div>
-			<div class="col-span-1 -ml-4">
-				{@render launch()}
-			</div>
-		{:else if $config.check_announcements}
-			<div class="col-span-1 m-4">
+	<div class="shell">
+		<section class="main" aria-label="Launcher">
+			<TopBar bind:openSettings />
+			<Launch
+				bind:this={launchPanel}
+				bind:osrsPsa
+				bind:rs3Psa
+				bind:launchConfirm
+				bind:openPluginMenu
+			></Launch>
+			{#if $config.fetch_rss_feeds}
+				<div class="news-wrap">
+					<News bind:osrsPsa bind:rs3Psa />
+				</div>
+			{:else if $config.check_announcements}
 				{#if osrsPsa && $config.selected.game === Game.osrs}
-					<div class={psaClass}>
-						{osrsPsa}
-					</div>
+					<div class={psaClass}>{osrsPsa}</div>
 				{:else if rs3Psa && $config.selected.game === Game.rs3}
-					<div class={psaClass}>
-						{rs3Psa}
-					</div>
+					<div class={psaClass}>{rs3Psa}</div>
 				{/if}
-			</div>
-			{@render launchMid()}
-		{:else}
-			{@render launchMid()}
-		{/if}
+			{/if}
+			<LogView logs={$logs} />
+		</section>
+		<AccountSidebar {logoutConfirm} onLaunch={launchCharacter} />
 	</div>
-	<LogView logs={$logs} />
 </MainLayout>
+
+<style>
+	.shell {
+		display: flex;
+		height: 100%;
+		width: 100%;
+	}
+	.main {
+		flex: 1;
+		min-width: 0;
+		padding: 0 28px 18px;
+		display: flex;
+		flex-direction: column;
+		gap: 18px;
+	}
+	.news-wrap {
+		min-height: 0;
+		flex: 1;
+		overflow-y: auto;
+		border: 1px solid var(--line);
+		border-radius: var(--r);
+		background: linear-gradient(180deg, var(--s1), var(--s2));
+	}
+</style>

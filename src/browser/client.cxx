@@ -267,14 +267,15 @@ Browser::Details Browser::Client::LauncherDetails() {
 		f.close();
 	}
 
+	// the launcher is frameless: the web UI draws its own title bar and window buttons
 	return Details {
-		.preferred_width = 800,
-		.preferred_height = 608,
+		.preferred_width = 1020,
+		.preferred_height = 700,
 		.startx = startx,
 		.starty = starty,
 		.center_on_open = true,
 		.resizeable = true,
-		.frame = true,
+		.frame = false,
 		.is_devtools = false,
 		.has_custom_js = false,
 	};
