@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { GlobalState } from '$lib/State/GlobalState';
-	import { themeStyle } from '$lib/Util/Themes';
+	import { themeColors, themeIsDark, themeStyle } from '$lib/Util/Themes';
 	interface Props {
 		children?: import('svelte').Snippet;
 	}
@@ -8,8 +8,14 @@
 	let { children }: Props = $props();
 
 	const { config } = GlobalState;
-	let darkTheme = $derived($config.use_dark_theme);
-	let vars = $derived(themeStyle($config.theme, $config.use_dark_theme, $config.accent));
+	const colors = $derived(themeColors($config.theme, $config.custom_theme));
+	const darkTheme = $derived(themeIsDark(colors));
+	const vars = $derived(themeStyle(colors));
+
+	// the theme decides light or dark; keep the saved flag (used by older dark-mode styles) in step
+	$effect(() => {
+		if ($config.use_dark_theme !== darkTheme) $config.use_dark_theme = darkTheme;
+	});
 </script>
 
 <main class:dark={darkTheme} class="bolt-root fixed top-0 h-screen w-screen text-sm" style={vars}>

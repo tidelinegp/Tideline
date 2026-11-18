@@ -229,7 +229,7 @@
 		top: 0;
 		right: 0;
 		height: 2px;
-		background: linear-gradient(90deg, var(--gold), transparent 70%);
+		background: linear-gradient(90deg, var(--gold), var(--accent2) 45%, transparent 85%);
 	}
 	.who {
 		display: flex;
@@ -282,8 +282,8 @@
 		flex-wrap: wrap;
 	}
 	.pill {
-		background: var(--inp);
-		border: 1px solid var(--inpb);
+		background: color-mix(in srgb, var(--accent2) 14%, var(--inp));
+		border: 1px solid color-mix(in srgb, var(--accent2) 40%, var(--inpb));
 		color: var(--txt);
 		border-radius: 99px;
 		padding: 2px 10px;

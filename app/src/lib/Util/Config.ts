@@ -28,10 +28,10 @@ export interface Config {
 	runelite_custom_jar: string | null;
 	runelite_launch_command: string | null;
 	hdos_launch_command: string | null;
-	/** id of the chosen colour theme, see Themes.ts */
+	/** id of the chosen colour theme, or "custom"; see Themes.ts */
 	theme?: string;
-	/** custom accent colour (#rrggbb) that overrides the theme's accent */
-	accent?: string | null;
+	/** the four colours of the user's own theme, used when theme is "custom" */
+	custom_theme?: { bg: string; accent: string; accent2: string; txt: string };
 	/** when each character was last launched, in ms since epoch */
 	last_played?: { [character_id: string]: number };
 	/** picture for each Jagex account, as an image data URL or web link, keyed by account id (sub) */
@@ -62,8 +62,7 @@ export const defaultConfig: Config = {
 	runelite_custom_jar: null,
 	runelite_launch_command: null,
 	hdos_launch_command: null,
-	theme: 'ember',
-	accent: null,
+	theme: 'gielinor',
 	last_played: {},
 	selected: {
 		game: Game.osrs,

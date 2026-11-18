@@ -37,14 +37,6 @@
 				onclick={() => ($config.selected.game = Game.osrs)}>OSRS</button
 			>
 		</div>
-		<button
-			class="ghost"
-			type="button"
-			disabled={!$initialized}
-			onclick={() => ($config.use_dark_theme = !$config.use_dark_theme)}
-		>
-			{$config.use_dark_theme ? 'Light' : 'Dark'}
-		</button>
 		<button class="ghost" type="button" disabled={!$initialized} onclick={() => openSettings()}>
 			Settings
 		</button>
@@ -74,7 +66,7 @@
 		width: 36px;
 		height: 36px;
 		border-radius: 10px;
-		background: linear-gradient(160deg, var(--g1), var(--g2));
+		background: linear-gradient(150deg, var(--g1), var(--g2) 62%, var(--accent2));
 		display: grid;
 		place-items: center;
 		color: var(--on-gold);

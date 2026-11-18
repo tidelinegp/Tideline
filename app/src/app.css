@@ -52,6 +52,7 @@
 	--g1: #f0c14b;
 	--g2: #d9a22e;
 	--pos: #15803d;
+	--accent2: #1f6fe5;
 	--on-gold: #2a1d02;
 	--glow1: color-mix(in srgb, var(--gold) 18%, transparent);
 	--glow2: rgba(31, 111, 229, 0.08);
