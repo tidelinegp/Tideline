@@ -321,6 +321,8 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 		ROUTE("minimize", Minimize)
 		ROUTE("toggle-maximize", ToggleMaximize)
 		ROUTE("running-clients", RunningClients)
+		ROUTE("dashboard-installed", DashboardInstalled)
+		ROUTE("start-dashboard", StartDashboard)
 		ROUTEIFPLUGINS("save-plugin-config", SavePluginConfig)
 		ROUTEIFPLUGINS("list-game-clients", ListGameClients)
 		ROUTEIFPLUGINS("read-json-file", ReadJsonFile)
@@ -601,6 +603,55 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::RunningClients(CefRefPtr
 #endif
 	json += "]";
 	return new Browser::ResourceHandler(json, 200, "application/json");
+}
+
+#if defined(_WIN32)
+// the local dashboard app that ships next to this program: <folder of this exe>\web\tideline-web.exe
+static std::filesystem::path DashboardExePath() {
+	wchar_t buf[MAX_PATH];
+	const DWORD len = GetModuleFileNameW(nullptr, buf, MAX_PATH);
+	if (len == 0 || len >= MAX_PATH) return std::filesystem::path();
+	return std::filesystem::path(buf).parent_path() / L"web" / L"tideline-web.exe";
+}
+#endif
+
+// Says whether the bundled dashboard app is installed, so the UI can offer it without asking the user to set anything up.
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::DashboardInstalled(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
+#if defined(_WIN32)
+	std::error_code ec;
+	const std::filesystem::path exe = DashboardExePath();
+	if (!exe.empty() && std::filesystem::exists(exe, ec)) {
+		QSENDOK();
+	}
+#endif
+	QSENDNOTFOUND();
+}
+
+// Starts the bundled dashboard app. It takes no input from the page: the program path is fixed, so this cannot be
+// used to run anything else. The app itself does nothing if a copy is already running.
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::StartDashboard(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
+#if defined(_WIN32)
+	std::error_code ec;
+	const std::filesystem::path exe = DashboardExePath();
+	if (exe.empty() || !std::filesystem::exists(exe, ec)) {
+		QSENDNOTFOUND();
+	}
+	std::wstring cmd = L"\"" + exe.wstring() + L"\"";
+	STARTUPINFOW si;
+	PROCESS_INFORMATION pi;
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+	const std::wstring dir = exe.parent_path().wstring();
+	if (CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW | DETACHED_PROCESS, nullptr, dir.c_str(), &si, &pi)) {
+		CloseHandle(pi.hThread);
+		CloseHandle(pi.hProcess);
+		QSENDOK();
+	}
+	QSENDSYSTEMERRORIF(true);
+#else
+	QSENDNOTSUPPORTED();
+#endif
 }
 
 CefRefPtr<CefDragHandler> Browser::Launcher::GetDragHandler() {

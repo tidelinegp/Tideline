@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { GlobalState } from '$lib/State/GlobalState';
 
-	const { config } = GlobalState;
+	const { config, dashboardInstalled } = GlobalState;
 
 	let status = $state('');
 	let testing = $state(false);
@@ -29,8 +29,9 @@
 <div class="set">
 	<h3>Integrations</h3>
 	<p class="intro">
-		Optional links to a dashboard website running on this PC. Nothing is sent anywhere else, and
-		everything here is off until you turn it on.
+		Links to the Tideline dashboard (market tools and your flipping log), which runs on this PC. When
+		the dashboard app is installed with Tideline, the Dashboard button starts it for you. Nothing is
+		sent anywhere else, and theme sync is off until you turn it on.
 	</p>
 
 	<label class="field" for="dash_url">
@@ -49,7 +50,12 @@
 	{#if status}<p class="status">{status}</p>{/if}
 
 	<label class="opt">
-		<input id="show_dashboard" type="checkbox" bind:checked={$config.show_dashboard_button} />
+		<input
+			id="show_dashboard"
+			type="checkbox"
+			checked={$config.show_dashboard_button ?? $dashboardInstalled}
+			onchange={(e) => ($config.show_dashboard_button = (e.currentTarget as HTMLInputElement).checked)}
+		/>
 		<span>
 			<b>Show an Open dashboard button</b>
 			<small>Adds a button to the top bar that opens the link above in your browser.</small>

@@ -3,9 +3,36 @@
 	import { Game } from '$lib/Util/Interfaces';
 	import { brand } from '$lib/Util/Brand';
 
-	const { config, initialized } = GlobalState;
+	import { LOCAL_DASHBOARD_URL } from '$lib/Util/Config';
+
+	const { config, initialized, dashboardInstalled } = GlobalState;
 
 	let { openSettings = $bindable() } = $props();
+
+	// the button shows when the user turned it on, or by default when the bundled dashboard app is installed
+	const showDashboard = $derived(
+		($config.show_dashboard_button ?? $dashboardInstalled) && !!$config.dashboard_url
+	);
+	let starting = $state(false);
+
+	// opens the dashboard in the browser; if it is the bundled app, starts it first and waits until it answers
+	async function openDashboard() {
+		const url = ($config.dashboard_url ?? '').trim().replace(/\/+$/, '');
+		if (!url) return;
+		if (url === LOCAL_DASHBOARD_URL && $dashboardInstalled) {
+			starting = true;
+			await fetch('/start-dashboard').catch(() => {});
+			for (let i = 0; i < 40; i++) {
+				const up = await fetch(`${url}/api/ping`, { cache: 'no-store' })
+					.then((r) => r.ok)
+					.catch(() => false);
+				if (up) break;
+				await new Promise((resolve) => setTimeout(resolve, 500));
+			}
+			starting = false;
+		}
+		fetch('/open-external-url', { method: 'POST', body: `${url}/` });
+	}
 
 	const today = new Date().toLocaleDateString(undefined, {
 		weekday: 'long',
@@ -36,16 +63,11 @@
 				onclick={() => ($config.selected.game = Game.osrs)}>OSRS</button
 			>
 		</div>
-		{#if $config.show_dashboard_button && $config.dashboard_url}
-			<button
-				class="ghost"
-				type="button"
-				title={$config.dashboard_url}
-				onclick={() => fetch('/open-external-url', { method: 'POST', body: $config.dashboard_url })}
-			>
-				Dashboard
-			</button>
-		{/if}
+		{#if showDashboard}
+				<button class="ghost" type="button" title={$config.dashboard_url} disabled={starting} onclick={openDashboard}>
+					{starting ? 'Starting…' : 'Dashboard'}
+				</button>
+			{/if}
 		<button class="ghost" type="button" disabled={!$initialized} onclick={() => openSettings()}>
 			Settings
 		</button>

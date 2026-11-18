@@ -13,6 +13,8 @@ export const GlobalState = {
 	launched: writable<{ [character_id: string]: number }>({}),
 	// titles of the game windows currently open on this PC, polled from the native app
 	clientTitles: writable<string[]>([]),
+	// whether the dashboard app that ships with Tideline is installed next to it
+	dashboardInstalled: writable<boolean>(false),
 	// characters whose game window has been seen open since they were launched: once such a window is
 	// gone again the character is no longer running, even within the start-up grace period
 	clientSeen: writable<{ [character_id: string]: boolean }>({})

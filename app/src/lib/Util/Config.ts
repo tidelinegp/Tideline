@@ -5,6 +5,9 @@ import { onWritableChange } from '$lib/Util/OnWritableChange';
 import { bolt } from '$lib/State/Bolt';
 import { get } from 'svelte/store';
 
+/** Address of the dashboard app that ships with Tideline; the Dashboard button starts it when it is not running. */
+export const LOCAL_DASHBOARD_URL = 'http://127.0.0.1:8765';
+
 let saveInProgress: boolean = false;
 let savePluginInProgress: boolean = false;
 
@@ -71,8 +74,8 @@ export const defaultConfig: Config = {
 	runelite_launch_command: null,
 	hdos_launch_command: null,
 	theme: 'auto',
-	dashboard_url: 'http://127.0.0.1:8080',
-	show_dashboard_button: false,
+	dashboard_url: 'http://127.0.0.1:8765',
+	// show_dashboard_button is left unset: the button shows when the bundled dashboard app is installed
 	sync_dashboard_theme: false,
 	last_played: {},
 	selected: {

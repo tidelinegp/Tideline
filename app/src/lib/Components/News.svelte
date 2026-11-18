@@ -105,15 +105,6 @@
 </script>
 
 <div class="min-h-0">
-	{#if osrsPsa && $config.selected.game === Game.osrs}
-		<div class={psaClass}>
-			{osrsPsa}
-		</div>
-	{:else if rs3Psa && $config.selected.game === Game.rs3}
-		<div class={psaClass}>
-			{rs3Psa}
-		</div>
-	{/if}
 	<div class="sec-h"><h3>News</h3></div>
 	<div>
 		{#if loading}

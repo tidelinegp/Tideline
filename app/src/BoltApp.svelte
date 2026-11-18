@@ -49,6 +49,9 @@
 			})
 			.catch(() => {});
 	onMount(() => {
+		fetch('/dashboard-installed')
+			.then((r) => GlobalState.dashboardInstalled.set(r.ok))
+			.catch(() => {});
 		pollClients();
 		const timer = setInterval(pollClients, POLL_MS);
 		const stopThemeSync = startThemeSync();
@@ -91,7 +94,16 @@
 
 	<div class="shell">
 		<section class="main" aria-label="Launcher">
-			<TopBar bind:openSettings />
+				<TopBar bind:openSettings />
+				{#if $config.check_announcements}
+					{@const psa = $config.selected.game === Game.osrs ? osrsPsa : rs3Psa}
+					{#if psa}
+						<div class="psa" role="status">
+							<span class="psa-ico" aria-hidden="true">!</span>
+							<span>{psa}</span>
+						</div>
+					{/if}
+				{/if}
 			<Launch
 				bind:this={launchPanel}
 				bind:osrsPsa
@@ -99,18 +111,12 @@
 				bind:launchConfirm
 				bind:openPluginMenu
 			></Launch>
-			{#if $config.fetch_rss_feeds}
-				<div class="news-wrap">
-					<News bind:osrsPsa bind:rs3Psa />
-				</div>
-			{:else if $config.check_announcements}
-				{#if osrsPsa && $config.selected.game === Game.osrs}
-					<div class={psaClass}>{osrsPsa}</div>
-				{:else if rs3Psa && $config.selected.game === Game.rs3}
-					<div class={psaClass}>{rs3Psa}</div>
+				{#if $config.fetch_rss_feeds}
+					<div class="news-wrap">
+						<News />
+					</div>
 				{/if}
-			{/if}
-			<LogView logs={$logs} />
+				<LogView logs={$logs} />
 		</section>
 		<AccountSidebar {logoutConfirm} onLaunch={launchCharacter} onEditAvatar={editAvatar} />
 	</div>
@@ -137,5 +143,27 @@
 		border: 1px solid var(--line);
 		border-radius: var(--r);
 		background: linear-gradient(180deg, var(--s1), var(--s2));
+	}
+	.psa {
+		display: flex;
+		gap: 12px;
+		align-items: flex-start;
+		padding: 12px 16px;
+		border-radius: var(--r);
+		border: 1px solid color-mix(in srgb, #f2a33a 55%, var(--line));
+		background: color-mix(in srgb, #f2a33a 12%, var(--s1));
+		font-size: 13.5px;
+		line-height: 1.45;
+	}
+	.psa-ico {
+		flex: none;
+		width: 22px;
+		height: 22px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		background: #f2a33a;
+		color: #1c1503;
+		font: 800 13px var(--disp);
 	}
 </style>
