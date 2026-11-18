@@ -11,5 +11,7 @@ export const brand = {
 	licenceUrl: 'https://www.gnu.org/licenses/agpl-3.0.html',
 	// where the source code of this version can be found; set once the public repository exists
 	sourceUrl: '' as string,
+	// where latest.json is published (the update check); empty until the release page exists
+	updateManifestUrl: '' as string,
 	fanContentPolicyUrl: 'https://legal.jagex.com/docs/policies/fan-content-policy'
 };

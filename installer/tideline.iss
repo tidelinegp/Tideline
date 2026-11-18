@@ -43,6 +43,8 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\tideline.exe"; Tasks: desktop
 
 [Run]
 Filename: "{app}\tideline.exe"; Description: "Start {#AppName}"; Flags: nowait postinstall skipifsilent
+; the in-app updater passes /RELAUNCH=1 so Tideline reopens by itself after a silent update
+Filename: "{app}\tideline.exe"; Flags: nowait; Check: ShouldRelaunch
 
 [Code]
 // The dashboard app runs hidden in the background, so make sure it (and Tideline) are not holding files before updating.
@@ -51,6 +53,11 @@ var
   ResultCode: Integer;
 begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM tideline-web.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+function ShouldRelaunch(): Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;

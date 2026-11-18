@@ -6,6 +6,8 @@
 	import TopBar from '$lib/Components/TopBar.svelte';
 	import News from '$lib/Components/News.svelte';
 	import AccountSidebar from '$lib/Components/AccountSidebar.svelte';
+	import UpdateBanner from '$lib/Components/UpdateBanner.svelte';
+	import { startUpdateChecks } from '$lib/Util/Updates';
 	import { logger } from '$lib/Util/Logger';
 	import { GlobalState } from '$lib/State/GlobalState';
 	import { Client, Game, type Session } from '$lib/Util/Interfaces';
@@ -55,12 +57,14 @@
 		pollClients();
 		const timer = setInterval(pollClients, POLL_MS);
 		const stopThemeSync = startThemeSync();
+		const stopUpdateChecks = startUpdateChecks();
 		// if an account came up without characters (e.g. a network hiccup at startup), try again
 		const retry = setInterval(() => reloadCharacters(true), 30_000);
 		return () => {
 			clearInterval(timer);
 			clearInterval(retry);
 			stopThemeSync();
+			stopUpdateChecks();
 		};
 	});
 
@@ -95,6 +99,7 @@
 	<div class="shell">
 		<section class="main" aria-label="Launcher">
 				<TopBar bind:openSettings />
+				<UpdateBanner />
 				{#if $config.check_announcements}
 					{@const psa = $config.selected.game === Game.osrs ? osrsPsa : rs3Psa}
 					{#if psa}

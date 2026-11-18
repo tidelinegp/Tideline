@@ -15,7 +15,16 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#include <urlmon.h>
+#include <bcrypt.h>
+#pragma comment(lib, "urlmon.lib")
+#pragma comment(lib, "bcrypt.lib")
 #endif
+
+#include <mutex>
+#include <thread>
+#include "../sha256/sha256.h"
+#include "update_key.h"
 
 #if defined(HAS_LIBARCHIVE) && defined(BOLT_PLUGINS)
 #include <archive.h>
@@ -323,6 +332,8 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 		ROUTE("running-clients", RunningClients)
 		ROUTE("dashboard-installed", DashboardInstalled)
 		ROUTE("start-dashboard", StartDashboard)
+		ROUTE("apply-update", ApplyUpdate)
+		ROUTE("update-status", UpdateStatus)
 		ROUTEIFPLUGINS("save-plugin-config", SavePluginConfig)
 		ROUTEIFPLUGINS("list-game-clients", ListGameClients)
 		ROUTEIFPLUGINS("read-json-file", ReadJsonFile)
@@ -652,6 +663,186 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::StartDashboard(CefRefPtr
 #else
 	QSENDNOTSUPPORTED();
 #endif
+}
+
+#if defined(_WIN32)
+// ---- Updates -------------------------------------------------------------------------------------------------------
+// The page finds out that a newer version exists (it reads latest.json) and passes the details here. Nothing is
+// trusted until it is checked: the installer's SHA-256 must match, and the signature over
+// "tideline-update|version|sha256|url" must verify against the public key compiled into this program. Only the
+// holder of the private key (the developer) can produce such a signature, so a hijacked download or manifest
+// cannot make this program run anything else.
+static std::mutex update_mutex;
+static std::string update_state = "idle";  // idle | downloading | verifying | installing | error
+static std::string update_message;
+static void SetUpdateState(const std::string& state, const std::string& message = "") {
+	std::lock_guard<std::mutex> lock(update_mutex);
+	update_state = state;
+	update_message = message;
+}
+
+static bool HexToBytes(const std::string& hex, std::vector<unsigned char>& out) {
+	if (hex.size() % 2 != 0) return false;
+	out.clear();
+	for (size_t i = 0; i < hex.size(); i += 2) {
+		unsigned int v = 0;
+		for (int j = 0; j < 2; j += 1) {
+			const char c = hex[i + j];
+			v <<= 4;
+			if (c >= '0' && c <= '9') v |= c - '0';
+			else if (c >= 'a' && c <= 'f') v |= c - 'a' + 10;
+			else if (c >= 'A' && c <= 'F') v |= c - 'A' + 10;
+			else return false;
+		}
+		out.push_back(static_cast<unsigned char>(v));
+	}
+	return true;
+}
+
+static bool Sha256OfFile(const std::filesystem::path& path, std::string& hex_out) {
+	std::ifstream f(path, std::ios::binary);
+	if (!f) return false;
+	SHA256_CTX ctx;
+	sha256_init(&ctx);
+	std::vector<char> buf(1 << 16);
+	while (f) {
+		f.read(buf.data(), buf.size());
+		const std::streamsize n = f.gcount();
+		if (n > 0) sha256_update(&ctx, reinterpret_cast<const unsigned char*>(buf.data()), static_cast<size_t>(n));
+	}
+	unsigned char hash[SHA256_BLOCK_SIZE];
+	sha256_final(&ctx, hash);
+	static const char digits[] = "0123456789abcdef";
+	hex_out.clear();
+	for (size_t i = 0; i < SHA256_BLOCK_SIZE; i += 1) {
+		hex_out += digits[hash[i] >> 4];
+		hex_out += digits[hash[i] & 15];
+	}
+	return true;
+}
+
+// ECDSA P-256 over SHA-256 of `message`, signature as 64 bytes r||s.
+static bool VerifyUpdateSignature(const std::string& message, const std::vector<unsigned char>& sig) {
+	if (sig.size() != 64) return false;
+	BCRYPT_ALG_HANDLE alg = nullptr;
+	BCRYPT_KEY_HANDLE key = nullptr;
+	bool ok = false;
+	if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_ECDSA_P256_ALGORITHM, nullptr, 0) < 0) return false;
+	std::vector<unsigned char> blob(sizeof(BCRYPT_ECCKEY_BLOB) + 64);
+	BCRYPT_ECCKEY_BLOB* header = reinterpret_cast<BCRYPT_ECCKEY_BLOB*>(blob.data());
+	header->dwMagic = BCRYPT_ECDSA_PUBLIC_P256_MAGIC;
+	header->cbKey = 32;
+	memcpy(blob.data() + sizeof(BCRYPT_ECCKEY_BLOB), UPDATE_PUBLIC_KEY, 64);
+	if (BCryptImportKeyPair(alg, nullptr, BCRYPT_ECCPUBLIC_BLOB, &key, blob.data(), static_cast<ULONG>(blob.size()), 0) >= 0) {
+		SHA256_CTX ctx;
+		sha256_init(&ctx);
+		sha256_update(&ctx, reinterpret_cast<const unsigned char*>(message.data()), message.size());
+		unsigned char hash[SHA256_BLOCK_SIZE];
+		sha256_final(&ctx, hash);
+		ok = BCryptVerifySignature(key, nullptr, hash, sizeof(hash), const_cast<unsigned char*>(sig.data()), static_cast<ULONG>(sig.size()), 0) >= 0;
+		BCryptDestroyKey(key);
+	}
+	BCryptCloseAlgorithmProvider(alg, 0);
+	return ok;
+}
+
+static void RunUpdate(std::string version, std::string url, std::string sha, std::string sig_hex) {
+	std::vector<unsigned char> sig;
+	if (sha.size() != 64 || !HexToBytes(sig_hex, sig) || url.empty() || version.empty()) {
+		SetUpdateState("error", "The update details are invalid.");
+		return;
+	}
+	for (const char c : version) {
+		if (!((c >= '0' && c <= '9') || c == '.' || c == '-' || (c >= 'a' && c <= 'z'))) {
+			SetUpdateState("error", "The update version is invalid.");
+			return;
+		}
+	}
+	// check the signature before touching the network: a forged manifest is rejected without downloading anything
+	if (!VerifyUpdateSignature("tideline-update|" + version + "|" + sha + "|" + url, sig)) {
+		SetUpdateState("error", "This update is not signed by Tideline, so it was not installed.");
+		return;
+	}
+	wchar_t tmp[MAX_PATH];
+	const DWORD tl = GetTempPathW(MAX_PATH, tmp);
+	if (tl == 0 || tl >= MAX_PATH) {
+		SetUpdateState("error", "Could not find a temporary folder.");
+		return;
+	}
+	const std::filesystem::path file = std::filesystem::path(tmp) / ("Tideline-Update-" + version + ".exe");
+	std::error_code ec;
+	std::filesystem::remove(file, ec);
+	SetUpdateState("downloading", "Downloading the update...");
+	const int wlen = MultiByteToWideChar(CP_UTF8, 0, url.c_str(), -1, nullptr, 0);
+	std::wstring wurl(wlen > 0 ? wlen - 1 : 0, L'\0');
+	if (wlen > 1) MultiByteToWideChar(CP_UTF8, 0, url.c_str(), -1, wurl.data(), wlen);
+	if (URLDownloadToFileW(nullptr, wurl.c_str(), file.c_str(), 0, nullptr) != S_OK) {
+		SetUpdateState("error", "The download failed. Check your connection and try again.");
+		return;
+	}
+	SetUpdateState("verifying", "Checking the download...");
+	std::string actual;
+	if (!Sha256OfFile(file, actual) || actual != sha) {
+		std::filesystem::remove(file, ec);
+		SetUpdateState("error", "The download did not match its checksum, so it was discarded.");
+		return;
+	}
+	SetUpdateState("installing", "Installing...");
+	// /SILENT shows a small progress window; the installer closes this program, replaces the files and starts it again
+	std::wstring cmd = L"\"" + file.wstring() + L"\" /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH=1";
+	STARTUPINFOW si;
+	PROCESS_INFORMATION pi;
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+	if (!CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, DETACHED_PROCESS, nullptr, tmp, &si, &pi)) {
+		SetUpdateState("error", "Could not start the installer.");
+		return;
+	}
+	CloseHandle(pi.hThread);
+	CloseHandle(pi.hProcess);
+}
+#endif
+
+// Starts installing an update the page found. Query: version, url, sha256, sig (all URL-encoded). Everything is
+// verified before anything runs; progress is read from update-status.
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::ApplyUpdate(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
+#if defined(_WIN32)
+	std::string version, url, sha, sig;
+	ParseQuery(query, [&](const std::string_view& key, const std::string_view& val) {
+		const std::string decoded = CefURIDecode(std::string(val), true, static_cast<cef_uri_unescape_rule_t>(UU_SPACES | UU_PATH_SEPARATORS | UU_URL_SPECIAL_CHARS_EXCEPT_PATH_SEPARATORS | UU_REPLACE_PLUS_WITH_SPACE)).ToString();
+		if (key == "version") version = decoded;
+		else if (key == "url") url = decoded;
+		else if (key == "sha256") sha = decoded;
+		else if (key == "sig") sig = decoded;
+	});
+	{
+		std::lock_guard<std::mutex> lock(update_mutex);
+		if (update_state == "downloading" || update_state == "verifying" || update_state == "installing") {
+			QSENDOK();
+		}
+		update_state = "downloading";
+		update_message = "Starting...";
+	}
+	std::thread(RunUpdate, version, url, sha, sig).detach();
+	QSENDOK();
+#else
+	QSENDNOTSUPPORTED();
+#endif
+}
+
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::UpdateStatus(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
+	std::string json = "{\"state\":\"idle\",\"message\":\"\"}";
+#if defined(_WIN32)
+	std::lock_guard<std::mutex> lock(update_mutex);
+	json = "{\"state\":\"" + update_state + "\",\"message\":\"";
+	for (const char c : update_message) {
+		if (c == '"' || c == '\\') json += '\\';
+		if (static_cast<unsigned char>(c) >= 0x20) json += c;
+	}
+	json += "\"}";
+#endif
+	return new Browser::ResourceHandler(json, 200, "application/json");
 }
 
 CefRefPtr<CefDragHandler> Browser::Launcher::GetDragHandler() {
