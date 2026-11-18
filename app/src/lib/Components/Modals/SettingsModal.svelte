@@ -4,12 +4,14 @@
 	import OsrsSettingsTab from '$lib/Components/Settings/OsrsSettingsTab.svelte';
 	import Rs3SettingsTab from '$lib/Components/Settings/Rs3SettingsTab.svelte';
 	import AppearanceSettingsTab from '$lib/Components/Settings/AppearanceSettingsTab.svelte';
+	import IntegrationsSettingsTab from '$lib/Components/Settings/IntegrationsSettingsTab.svelte';
 	import { saveConfig } from '$lib/Util/Config';
 
 	// settings categories
 	enum Tab {
 		general,
 		appearance,
+		integrations,
 		osrs,
 		rs3
 	}
@@ -20,6 +22,7 @@
 	const tabs = [
 		{ id: Tab.general, label: 'General' },
 		{ id: Tab.appearance, label: 'Appearance' },
+		{ id: Tab.integrations, label: 'Integrations' },
 		{ id: Tab.osrs, label: 'OSRS' },
 		{ id: Tab.rs3, label: 'RS3' }
 	];
@@ -47,6 +50,8 @@
 				<GeneralSettingsTab />
 			{:else if openTab == Tab.appearance}
 				<AppearanceSettingsTab />
+			{:else if openTab == Tab.integrations}
+				<IntegrationsSettingsTab />
 			{:else if openTab == Tab.osrs}
 				<OsrsSettingsTab />
 			{:else if openTab == Tab.rs3}

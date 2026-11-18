@@ -15,6 +15,7 @@
 	import LogoutConfirmModal from '$lib/Components/Modals/LogoutConfirmModal.svelte';
 	import SettingsModal from '$lib/Components/Modals/SettingsModal.svelte';
 	import AvatarModal from '$lib/Components/Modals/AvatarModal.svelte';
+	import { startThemeSync } from '$lib/Util/ThemeSync';
 	import { bolt } from '$lib/State/Bolt';
 
 	const logs = logger.logs;
@@ -45,7 +46,11 @@
 	onMount(() => {
 		pollClients();
 		const timer = setInterval(pollClients, POLL_MS);
-		return () => clearInterval(timer);
+		const stopThemeSync = startThemeSync();
+		return () => {
+			clearInterval(timer);
+			stopThemeSync();
+		};
 	});
 
 	let launchConfirm = (launch: (game: Game, client: Client) => void, game: Game, client: Client) => launchConfirmModal.open(launch, game, client);

@@ -34,6 +34,14 @@ export interface Config {
 	custom_theme?: { bg: string; accent: string; accent2: string; txt: string };
 	/** when each character was last launched, in ms since epoch */
 	last_played?: { [character_id: string]: number };
+	/** optional link to a dashboard website running on this PC, e.g. http://127.0.0.1:8080 */
+	dashboard_url?: string;
+	/** show an "Open dashboard" button in the top bar */
+	show_dashboard_button?: boolean;
+	/** share the colour theme with the dashboard at dashboard_url */
+	sync_dashboard_theme?: boolean;
+	/** when the theme was last changed here or taken from the dashboard, in ms since epoch */
+	theme_updated?: number;
 	/** picture for each Jagex account, as an image data URL or web link, keyed by account id (sub) */
 	avatars?: { [sub: string]: string };
 	selected: {
@@ -63,6 +71,9 @@ export const defaultConfig: Config = {
 	runelite_launch_command: null,
 	hdos_launch_command: null,
 	theme: 'gielinor',
+	dashboard_url: 'http://127.0.0.1:8080',
+	show_dashboard_button: false,
+	sync_dashboard_theme: false,
 	last_played: {},
 	selected: {
 		game: Game.osrs,

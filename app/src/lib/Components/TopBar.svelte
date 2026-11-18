@@ -37,6 +37,16 @@
 				onclick={() => ($config.selected.game = Game.osrs)}>OSRS</button
 			>
 		</div>
+		{#if $config.show_dashboard_button && $config.dashboard_url}
+			<button
+				class="ghost"
+				type="button"
+				title={$config.dashboard_url}
+				onclick={() => fetch('/open-external-url', { method: 'POST', body: $config.dashboard_url })}
+			>
+				Dashboard
+			</button>
+		{/if}
 		<button class="ghost" type="button" disabled={!$initialized} onclick={() => openSettings()}>
 			Settings
 		</button>
