@@ -17,7 +17,7 @@
 	const CACHE_TS_KEY_OSRS = 'bolt:news:feed:ts-osrs';
 	const CACHE_KEY_RS3 = 'bolt:news:feed-rs3';
 	const CACHE_TS_KEY_RS3 = 'bolt:news:feed:ts-rs3';
-	const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+	const CACHE_TTL = 15 * 60 * 1000; // 15 minutes (it was 6 hours, so new posts took far too long to show up)
 
 	const parseAndSet = (xmlString: string) => {
 		const parser = new DOMParser();
@@ -44,7 +44,7 @@
 		newsItems = parsed;
 	};
 
-	export const fetchNews = async () => {
+	export const fetchNews = async (force = false) => {
 		loading = true;
 		const IS_OSRS = $config.selected.game === Game.osrs;
 		const CACHE_KEY = IS_OSRS ? CACHE_KEY_OSRS : CACHE_KEY_RS3;
@@ -55,7 +55,7 @@
 			const rawCached = localStorage.getItem(CACHE_KEY);
 			const cachedTs = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
 			// Use cached if fresh
-			if (rawCached && now - cachedTs < CACHE_TTL) {
+			if (!force && rawCached && now - cachedTs < CACHE_TTL) {
 				parseAndSet(rawCached);
 				loading = false;
 				return;
@@ -82,7 +82,7 @@
 		} catch (error) {
 			console.error('Error fetching or parsing RSS feed:', error);
 			// fallback to cached data if available
-			const rawCached = localStorage.getItem(CACHE_KEY_OSRS);
+			const rawCached = localStorage.getItem($config.selected.game === Game.osrs ? CACHE_KEY_OSRS : CACHE_KEY_RS3);
 			if (rawCached) {
 				parseAndSet(rawCached);
 			}
@@ -105,7 +105,12 @@
 </script>
 
 <div class="min-h-0">
-	<div class="sec-h"><h3>News</h3></div>
+	<div class="sec-h">
+		<h3>News</h3>
+		<button type="button" class="refresh" title="Check for new posts" aria-label="Refresh news" onclick={() => fetchNews(true)}>
+			<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></svg>
+		</button>
+	</div>
 	<div>
 		{#if loading}
 			{#each Array(6)}
@@ -123,6 +128,24 @@
 	.sec-h {
 		padding: 14px 14px 8px;
 		border-bottom: 1px solid var(--line);
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.refresh {
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		border-radius: 8px;
+		background: none;
+		border: 0;
+		color: var(--mut);
+		cursor: pointer;
+	}
+	.refresh:hover {
+		background: var(--hov);
+		color: var(--txt);
 	}
 	.sec-h h3 {
 		margin: 0;
