@@ -3,11 +3,13 @@
 	import GeneralSettingsTab from '$lib/Components/Settings/GeneralSettingsTab.svelte';
 	import OsrsSettingsTab from '$lib/Components/Settings/OsrsSettingsTab.svelte';
 	import Rs3SettingsTab from '$lib/Components/Settings/Rs3SettingsTab.svelte';
+	import AppearanceSettingsTab from '$lib/Components/Settings/AppearanceSettingsTab.svelte';
 	import { saveConfig } from '$lib/Util/Config';
 
 	// settings categories
 	enum Tab {
 		general,
+		appearance,
 		osrs,
 		rs3
 	}
@@ -17,6 +19,7 @@
 
 	const tabs = [
 		{ id: Tab.general, label: 'General' },
+		{ id: Tab.appearance, label: 'Appearance' },
 		{ id: Tab.osrs, label: 'OSRS' },
 		{ id: Tab.rs3, label: 'RS3' }
 	];
@@ -42,6 +45,8 @@
 		<div class="content">
 			{#if openTab == Tab.general}
 				<GeneralSettingsTab />
+			{:else if openTab == Tab.appearance}
+				<AppearanceSettingsTab />
 			{:else if openTab == Tab.osrs}
 				<OsrsSettingsTab />
 			{:else if openTab == Tab.rs3}
@@ -88,7 +93,7 @@
 		background: var(--hov);
 	}
 	.tabs button[aria-current='true'] {
-		background: linear-gradient(90deg, rgba(240, 193, 75, 0.18), rgba(240, 193, 75, 0.04));
+		background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 18%, transparent), color-mix(in srgb, var(--gold) 4%, transparent));
 		color: var(--gold);
 		box-shadow: inset 2px 0 0 var(--gold);
 	}

@@ -8,5 +8,7 @@ export const GlobalState = {
 	configHasPendingChanges: false,
 	pluginConfigHasPendingChanges: false,
 	config: writable<Config>(defaultConfig),
-	sessions: writable<{ [sub: string]: Session }>({})
+	sessions: writable<{ [sub: string]: Session }>({}),
+	// characters launched during this run of the launcher, by character id (ms since epoch)
+	launched: writable<{ [character_id: string]: number }>({})
 };

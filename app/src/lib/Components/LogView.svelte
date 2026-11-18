@@ -1,41 +1,77 @@
 <script lang="ts">
 	import { Severity, type Log } from '$lib/Util/Logger';
+	import { bolt } from '$lib/State/Bolt';
 
 	interface Props {
 		logs: Log[];
 	}
 
 	let { logs }: Props = $props();
-	const recent = $derived(logs.slice(-3));
+	const latest = $derived(logs.length > 0 ? logs[logs.length - 1] : null);
 </script>
 
-<div class="log" id="message_list" aria-live="polite">
-	{#each recent as { date, severity, content }}
-		<div class:err={severity === Severity.error} class:warn={severity === Severity.warn}>
-			<b>{date?.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</b>
-			{content}
-		</div>
-	{/each}
-</div>
+<footer class="foot" id="message_list" aria-live="polite">
+	<span
+		class="status"
+		class:err={latest?.severity === Severity.error}
+		class:warn={latest?.severity === Severity.warn}
+	>
+		<span class="led"></span>
+		{#if latest}
+			<b>{latest.date?.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</b>
+			<span class="msg">{latest.content}</span>
+		{:else}
+			<span class="msg">Ready</span>
+		{/if}
+	</span>
+	<span class="ver">Bolt {bolt.boltVersion ?? ''}</span>
+</footer>
 
 <style>
-	.log {
+	.foot {
 		margin-top: auto;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding-top: 12px;
+		border-top: 1px solid var(--line);
 		color: var(--mut);
 		font-size: 12.5px;
-		display: grid;
-		gap: 2px;
-		min-height: 52px;
-		align-content: end;
+	}
+	.status {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+	.led {
+		flex: none;
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--pos);
+	}
+	.warn .led {
+		background: #f2a33a;
+	}
+	.err .led {
+		background: #f87171;
+	}
+	.err .msg {
+		color: #f87171;
 	}
 	b {
 		color: var(--gold);
 		font-weight: 650;
+		flex: none;
 	}
-	.err {
-		color: #f87171;
+	.msg {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
-	.warn {
-		color: #f2a33a;
+	.ver {
+		margin-left: auto;
+		flex: none;
 	}
 </style>

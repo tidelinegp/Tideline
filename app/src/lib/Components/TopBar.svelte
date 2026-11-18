@@ -117,9 +117,9 @@
 		cursor: pointer;
 	}
 	.seg button[aria-pressed='true'] {
-		background: linear-gradient(90deg, rgba(240, 193, 75, 0.2), rgba(240, 193, 75, 0.06));
+		background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 20%, transparent), color-mix(in srgb, var(--gold) 6%, transparent));
 		color: var(--gold);
-		box-shadow: inset 0 0 0 1px rgba(240, 193, 75, 0.35);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 35%, transparent);
 	}
 	.ghost {
 		background: var(--s2);
@@ -136,6 +136,6 @@
 	}
 	button:focus-visible {
 		outline: none;
-		box-shadow: 0 0 0 3px rgba(240, 193, 75, 0.3);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 30%, transparent);
 	}
 </style>

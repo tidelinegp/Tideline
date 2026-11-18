@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { GlobalState } from '$lib/State/GlobalState';
+	import { themeStyle } from '$lib/Util/Themes';
 	interface Props {
 		children?: import('svelte').Snippet;
 	}
@@ -8,9 +9,10 @@
 
 	const { config } = GlobalState;
 	let darkTheme = $derived($config.use_dark_theme);
+	let vars = $derived(themeStyle($config.theme, $config.use_dark_theme, $config.accent));
 </script>
 
-<main class:dark={darkTheme} class="bolt-root fixed top-0 h-screen w-screen text-sm">
+<main class:dark={darkTheme} class="bolt-root fixed top-0 h-screen w-screen text-sm" style={vars}>
 	{@render children?.()}
 </main>
 

@@ -11,7 +11,7 @@
 	import { Client, clientMap, Game } from '$lib/Util/Interfaces';
 	import { logger } from '$lib/Util/Logger';
 
-	let { config, initialized, sessions } = GlobalState;
+	let { config, initialized, sessions, launched } = GlobalState;
 	let selectedUserId = $derived($config.selected.user_id);
 	let selectedCharacterId = $derived(
 		selectedUserId ? $config.userDetails[selectedUserId]?.account_id : null
@@ -19,6 +19,9 @@
 	let session = $derived(selectedUserId ? $sessions[selectedUserId] : null);
 	let selectedCharacter = $derived(
 		session && selectedCharacterId ? session.characters[selectedCharacterId] : null
+	);
+	let lastPlayed = $derived(
+		selectedCharacterId ? ($config.last_played ?? {})[selectedCharacterId] : undefined
 	);
 
 	// messages about game downtime, retrieved from game server
@@ -75,6 +78,9 @@
 		if (!selectedUserId || !selectedCharacterId || !session) {
 			return logger.warn('please log in and select a character to play');
 		}
+		const now = Date.now();
+		$config.last_played = { ...($config.last_played ?? {}), [selectedCharacterId]: now };
+		launched.update((l) => ({ ...l, [selectedCharacterId]: now }));
 		saveConfig();
 
 		const { sessionId } = session;
@@ -115,55 +121,86 @@
 		}
 	}
 
+	// shows "Launching" on the Play button for a moment after a launch, so it is clear something happened
+	let launching = $state(false);
+	let launchingTimer: ReturnType<typeof setTimeout> | undefined;
+
 	// the Play button, also called by the account sidebar after it selects a character
 	export function play(): void {
+		if (launching) return;
+		launching = true;
+		clearTimeout(launchingTimer);
+		launchingTimer = setTimeout(() => (launching = false), 3500);
 		if (gameEnabled) {
 			launch($config.selected.game, $config.selected.client);
 		} else {
 			launchConfirm(launch, $config.selected.game, $config.selected.client);
 		}
 	}
+
+	function ago(ms: number | undefined): string {
+		if (!ms) return 'Not played yet';
+		const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+		if (s < 60) return 'Played just now';
+		const m = Math.round(s / 60);
+		if (m < 60) return `Played ${m}m ago`;
+		const h = Math.round(m / 60);
+		if (h < 48) return `Played ${h}h ago`;
+		return `Played ${Math.round(h / 24)}d ago`;
+	}
 </script>
 
 <section class="hero" aria-label="Ready to play">
-	<div class="info">
-		<div class="eyebrow">{selectedCharacter ? 'Ready to play' : 'Pick a character'}</div>
-		<h2>
-			{selectedCharacter?.displayName ||
-				(Object.keys($sessions).length > 0 ? 'Choose a character' : 'Log in to start')}
-		</h2>
-		<div class="acct-line">
-			{session ? `Jagex account ${session.displayName}` : 'Add a Jagex account in the sidebar'}
+	<div class="who">
+		<div class="ring" aria-hidden="true">
+			{(selectedCharacter?.displayName?.trim()[0] ?? '?').toUpperCase()}
 		</div>
-		<div class="facts">
-			{#if $config.selected.game == Game.osrs}
-				<div>
-					<small>Game client</small>
-					<select aria-label="Game client" bind:value={$config.selected.client}>
-						{#each clientMap[$config.selected.game] as client}
-							<option value={client}>{client}</option>
-						{/each}
-					</select>
-				</div>
-			{:else if $config.selected.game === Game.rs3}
-				<div>
-					<small>RS3 plugins</small>
-					<button
-						class="plug"
-						type="button"
-						disabled={!bolt.hasBoltPlugins}
-						title={bolt.hasBoltPlugins ? null : 'This feature is disabled'}
-						onclick={openPluginMenu}
-					>
-						Plugin menu
-					</button>
-				</div>
-			{/if}
+		<div class="id">
+			<div class="eyebrow">{selectedCharacter ? 'Ready to play' : 'Pick a character'}</div>
+			<h2>
+				{selectedCharacter?.displayName ||
+					(Object.keys($sessions).length > 0 ? 'Choose a character' : 'Log in to start')}
+			</h2>
+			<div class="meta">
+				{#if session}
+					<span class="pill">{session.displayName}</span>
+					<span>{ago(lastPlayed)}</span>
+				{:else}
+					<span>Add a Jagex account in the sidebar</span>
+				{/if}
+			</div>
 		</div>
 	</div>
-	<div class="playcol">
-		<button class="play" type="button" disabled={!$initialized || !selectedCharacter} onclick={play}>
-			Play
+
+	<div class="act">
+		{#if $config.selected.game == Game.osrs}
+			<div class="clients" role="group" aria-label="Game client">
+				{#each clientMap[$config.selected.game] as client}
+					<button
+						type="button"
+						aria-pressed={$config.selected.client === client}
+						onclick={() => ($config.selected.client = client)}>{client}</button
+					>
+				{/each}
+			</div>
+		{:else if $config.selected.game === Game.rs3}
+			<button
+				class="plug"
+				type="button"
+				disabled={!bolt.hasBoltPlugins}
+				title={bolt.hasBoltPlugins ? null : 'This feature is disabled'}
+				onclick={openPluginMenu}
+			>
+				Plugin menu
+			</button>
+		{/if}
+		<button
+			class="play"
+			type="button"
+			disabled={!$initialized || !selectedCharacter || launching}
+			onclick={play}
+		>
+			{launching ? 'Launching…' : 'Play'}
 		</button>
 	</div>
 </section>
@@ -174,7 +211,7 @@
 		background: linear-gradient(180deg, var(--s1), var(--s2));
 		border: 1px solid var(--line);
 		border-radius: var(--r);
-		padding: 26px 28px;
+		padding: 22px 24px;
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
 		gap: 22px;
@@ -188,7 +225,28 @@
 		top: 0;
 		right: 0;
 		height: 2px;
-		background: linear-gradient(90deg, var(--gold), transparent);
+		background: linear-gradient(90deg, var(--gold), transparent 70%);
+	}
+	.who {
+		display: flex;
+		align-items: center;
+		gap: 18px;
+		min-width: 0;
+	}
+	.ring {
+		flex: none;
+		width: 64px;
+		height: 64px;
+		border-radius: 20px;
+		display: grid;
+		place-items: center;
+		font: 800 28px var(--disp);
+		color: var(--gold);
+		background: color-mix(in srgb, var(--gold) 10%, var(--inp));
+		border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--inpb));
+	}
+	.id {
+		min-width: 0;
 	}
 	.eyebrow {
 		letter-spacing: 0.16em;
@@ -198,54 +256,65 @@
 		text-transform: uppercase;
 	}
 	h2 {
-		margin: 8px 0 4px;
-		font: 800 clamp(30px, 5vw, 54px) var(--disp);
+		margin: 4px 0 6px;
+		font: 800 clamp(26px, 4vw, 44px) var(--disp);
 		letter-spacing: -0.04em;
 		line-height: 1.05;
 		overflow-wrap: anywhere;
 	}
-	.acct-line {
-		color: var(--mut);
-		font-size: 15px;
-	}
-	.facts {
+	.meta {
 		display: flex;
-		gap: 22px;
-		flex-wrap: wrap;
-		margin-top: 20px;
-	}
-	.facts > div {
-		border-left: 2px solid var(--gold);
-		padding: 2px 0 2px 11px;
-		min-width: 0;
-	}
-	.facts small {
-		display: block;
+		align-items: center;
+		gap: 10px;
 		color: var(--mut);
-		font-size: 12px;
+		font-size: 13.5px;
+		flex-wrap: wrap;
 	}
-	select {
+	.pill {
 		background: var(--inp);
-		color: var(--txt);
 		border: 1px solid var(--inpb);
-		border-radius: 9px;
-		padding: 6px 10px;
-		font: 650 14px var(--body);
-		margin-top: 2px;
-		cursor: pointer;
-	}
-	select option {
-		background: var(--s1);
 		color: var(--txt);
+		border-radius: 99px;
+		padding: 2px 10px;
+		font-weight: 600;
+		font-size: 12.5px;
+	}
+	.act {
+		display: grid;
+		gap: 10px;
+		justify-items: stretch;
+		min-width: 190px;
+	}
+	.clients {
+		display: flex;
+		background: var(--s2);
+		border: 1px solid var(--line);
+		border-radius: 11px;
+		padding: 3px;
+	}
+	.clients button {
+		flex: 1;
+		background: none;
+		border: 0;
+		color: var(--mut);
+		font: 650 12.5px var(--body);
+		padding: 6px 10px;
+		border-radius: 8px;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.clients button[aria-pressed='true'] {
+		background: color-mix(in srgb, var(--gold) 16%, transparent);
+		color: var(--gold);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 35%, transparent);
 	}
 	.plug {
 		background: var(--inp);
 		color: var(--txt);
 		border: 1px solid var(--inpb);
-		border-radius: 9px;
-		padding: 6px 12px;
-		font: 650 14px var(--body);
-		margin-top: 2px;
+		border-radius: 10px;
+		padding: 8px 12px;
+		font: 650 13.5px var(--body);
 		cursor: pointer;
 	}
 	.plug:disabled {
@@ -256,26 +325,35 @@
 		background: linear-gradient(90deg, var(--g2), var(--g1));
 		color: var(--on-gold);
 		border: 0;
-		border-radius: 14px;
-		font: 800 20px var(--disp);
+		border-radius: 13px;
+		font: 800 19px var(--disp);
 		letter-spacing: -0.01em;
-		padding: 18px 44px;
+		padding: 15px 36px;
 		cursor: pointer;
+		box-shadow: 0 6px 22px color-mix(in srgb, var(--gold) 28%, transparent);
+		transition: transform 0.12s, filter 0.12s;
 	}
 	.play:hover:not(:disabled) {
 		filter: brightness(1.07);
+		transform: translateY(-1px);
 	}
 	.play:disabled {
-		opacity: 0.45;
+		opacity: 0.5;
 		cursor: not-allowed;
+		box-shadow: none;
 	}
-	:is(button, select):focus-visible {
+	button:focus-visible {
 		outline: none;
-		box-shadow: 0 0 0 3px rgba(240, 193, 75, 0.3);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 30%, transparent);
 	}
 	@media (max-width: 760px) {
 		.hero {
 			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.play {
+			transition: none;
 		}
 	}
 </style>

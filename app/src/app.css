@@ -21,7 +21,7 @@
 	--g2: #d9a22e;
 	--pos: #15803d;
 	--on-gold: #2a1d02;
-	--glow1: rgba(240, 193, 75, 0.18);
+	--glow1: color-mix(in srgb, var(--gold) 18%, transparent);
 	--glow2: rgba(31, 111, 229, 0.08);
 	--disp: 'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
 	--body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -92,7 +92,7 @@
 .bolt-dialog select:focus-visible {
 	outline: none;
 	border-color: var(--gold) !important;
-	box-shadow: 0 0 0 3px rgba(240, 193, 75, 0.2);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 20%, transparent);
 }
 /* older tailwind-styled buttons in dialogs: blue buttons become quiet outlines, green ones become the gold primary */
 .bolt-dialog .bg-blue-500,

@@ -28,6 +28,12 @@ export interface Config {
 	runelite_custom_jar: string | null;
 	runelite_launch_command: string | null;
 	hdos_launch_command: string | null;
+	/** id of the chosen colour theme, see Themes.ts */
+	theme?: string;
+	/** custom accent colour (#rrggbb) that overrides the theme's accent */
+	accent?: string | null;
+	/** when each character was last launched, in ms since epoch */
+	last_played?: { [character_id: string]: number };
 	selected: {
 		game: Game;
 		client: Client;
@@ -54,6 +60,9 @@ export const defaultConfig: Config = {
 	runelite_custom_jar: null,
 	runelite_launch_command: null,
 	hdos_launch_command: null,
+	theme: 'ember',
+	accent: null,
+	last_played: {},
 	selected: {
 		game: Game.osrs,
 		client: Client.runelite,

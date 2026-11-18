@@ -3,7 +3,17 @@
 	import type { Session } from '$lib/Util/Interfaces';
 	import WindowControls from '$lib/Components/WindowControls.svelte';
 
-	const { config, sessions, initialized } = GlobalState;
+	const { config, sessions, initialized, launched } = GlobalState;
+
+	// "5m", "3h", "2d" since the character was last launched, empty if never
+	function short(ms: number | undefined): string {
+		if (!ms) return '';
+		const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
+		if (m < 1) return 'now';
+		if (m < 60) return `${m}m`;
+		const h = Math.round(m / 60);
+		return h < 48 ? `${h}h` : `${Math.round(h / 24)}d`;
+	}
 
 	let {
 		logoutConfirm,
@@ -84,8 +94,9 @@
 								disabled={!$initialized}
 								onclick={() => pick(sub, characterId)}
 							>
-								<span class="dot"></span>
+								<span class="dot" class:run={!!$launched[characterId]}></span>
 								<span class="n">{character.displayName || 'New Character'}</span>
+								<span class="when">{short($config.last_played?.[characterId])}</span>
 								<span class="go">PLAY</span>
 							</button>
 						{:else}
@@ -245,7 +256,7 @@
 		background: var(--hov);
 	}
 	.char[aria-current='true'] {
-		background: linear-gradient(90deg, rgba(240, 193, 75, 0.18), rgba(240, 193, 75, 0.04));
+		background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 18%, transparent), color-mix(in srgb, var(--gold) 4%, transparent));
 		color: var(--gold);
 		font-weight: 650;
 		box-shadow: inset 2px 0 0 var(--gold);
@@ -259,6 +270,20 @@
 	}
 	.char[aria-current='true'] .dot {
 		background: var(--gold);
+	}
+	.char .dot.run {
+		background: var(--pos);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--pos) 25%, transparent);
+	}
+	.when {
+		margin-left: auto;
+		color: var(--mut);
+		font-size: 12px;
+		font-weight: 500;
+	}
+	.char:hover:not(:disabled) .when,
+	.char:focus-visible .when {
+		display: none;
 	}
 	.n {
 		min-width: 0;
@@ -306,7 +331,7 @@
 	}
 	button:focus-visible {
 		outline: none;
-		box-shadow: 0 0 0 3px rgba(240, 193, 75, 0.3);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 30%, transparent);
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.chev {
