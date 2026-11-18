@@ -247,7 +247,18 @@ bool LockXdgDirectories(std::filesystem::path& config_dir, std::filesystem::path
 #if defined(_WIN32)
 int wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, wchar_t* lpCmdLine, int nCmdShow) {
 	setlocale(LC_CTYPE, "");
-	
+
+	// An app started from the taskbar or by double-clicking has no valid standard output or error.
+	// Point those at NUL so the diagnostic prints below and in the browser code never write to an
+	// invalid handle.
+	for (const DWORD which : {STD_OUTPUT_HANDLE, STD_ERROR_HANDLE}) {
+		const HANDLE h = GetStdHandle(which);
+		if (h == nullptr || h == INVALID_HANDLE_VALUE || GetFileType(h) == FILE_TYPE_UNKNOWN) {
+			FILE* ignored = nullptr;
+			freopen_s(&ignored, "NUL", "w", which == STD_OUTPUT_HANDLE ? stdout : stderr);
+		}
+	}
+
 	// Provide CEF with command-line arguments
 	// Re-run with --disable-web-security if it's not already there, because a certain company's API endpoints
 	// don't have correct access control settings; remove this setting if they ever get their stuff together
