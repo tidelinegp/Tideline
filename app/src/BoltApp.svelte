@@ -16,6 +16,7 @@
 	import SettingsModal from '$lib/Components/Modals/SettingsModal.svelte';
 	import AvatarModal from '$lib/Components/Modals/AvatarModal.svelte';
 	import { startThemeSync } from '$lib/Util/ThemeSync';
+	import { reloadCharacters } from '$lib/Util/Characters';
 	import { bolt } from '$lib/State/Bolt';
 
 	const logs = logger.logs;
@@ -47,8 +48,11 @@
 		pollClients();
 		const timer = setInterval(pollClients, POLL_MS);
 		const stopThemeSync = startThemeSync();
+		// if an account came up without characters (e.g. a network hiccup at startup), try again
+		const retry = setInterval(() => reloadCharacters(true), 30_000);
 		return () => {
 			clearInterval(timer);
+			clearInterval(retry);
 			stopThemeSync();
 		};
 	});

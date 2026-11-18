@@ -44,7 +44,7 @@
 		if (canSelfClose && dialog === (e.target as Node)) close();
 	}}
 	class:dark={darkTheme}
-	class="bolt-root bolt-dialog {className}"
+	class="bolt-dialog {className}"
 >
 	{#if canSelfClose}
 		<button class="x" type="button" aria-label="Close" onclick={close}>

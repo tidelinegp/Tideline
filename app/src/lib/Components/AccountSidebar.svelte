@@ -2,6 +2,7 @@
 	import { GlobalState } from '$lib/State/GlobalState';
 	import type { Session } from '$lib/Util/Interfaces';
 	import WindowControls from '$lib/Components/WindowControls.svelte';
+	import { reloadCharacters } from '$lib/Util/Characters';
 
 	const { config, sessions, initialized, launched, clientTitles } = GlobalState;
 
@@ -67,6 +68,16 @@
 	<div class="side-h">
 		<h2>Accounts</h2>
 		<small>{accounts.length} {accounts.length === 1 ? 'account' : 'accounts'}</small>
+		<button
+			class="refresh"
+			type="button"
+			title="Reload characters"
+			aria-label="Reload characters"
+			disabled={!$initialized}
+			onclick={() => reloadCharacters(false)}
+		>
+			<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></svg>
+		</button>
 	</div>
 
 	<div class="accts">
@@ -183,6 +194,22 @@
 		color: var(--mut);
 		font-size: 12.5px;
 		margin-left: auto;
+	}
+	.refresh {
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		border-radius: 8px;
+		background: none;
+		border: 0;
+		color: var(--mut);
+		cursor: pointer;
+		align-self: center;
+	}
+	.refresh:hover:not(:disabled) {
+		background: var(--hov);
+		color: var(--txt);
 	}
 	.accts {
 		display: grid;

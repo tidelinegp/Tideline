@@ -66,6 +66,9 @@ const handleSessionList = async (list: { [sub: string]: Session }) => {
 					session.isNew = false;
 				}
 			});
+		}).catch((e) => {
+			// one account failing to load (e.g. a network hiccup) must not hide all the others
+			logger.error(`could not load characters for ${session.displayName}#${session.suffix}: ${e}`);
 		});
 		return promise;
 	});

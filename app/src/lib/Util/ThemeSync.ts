@@ -7,7 +7,7 @@ import { get } from 'svelte/store';
 // The newest change wins. Nothing is sent unless sync is enabled, and only the theme name and four
 // colours are ever sent.
 
-const POLL_MS = 60_000;
+const POLL_MS = 15_000;
 const DEBOUNCE_MS = 500;
 
 interface RemoteTheme {
@@ -104,13 +104,23 @@ export function startThemeSync(): () => void {
 
 	pull();
 	const timer = setInterval(pull, POLL_MS);
-	const onFocus = () => pull();
-	window.addEventListener('focus', onFocus);
+	let lastCheck = 0;
+	const onActivity = () => {
+		const now = Date.now();
+		if (now - lastCheck < 4000) return;
+		lastCheck = now;
+		pull();
+	};
+	window.addEventListener('focus', onActivity);
+	document.addEventListener('visibilitychange', onActivity);
+	window.addEventListener('mousemove', onActivity);
 
 	return () => {
 		unsubscribe();
 		clearInterval(timer);
 		clearTimeout(pushTimer);
-		window.removeEventListener('focus', onFocus);
+		window.removeEventListener('focus', onActivity);
+		document.removeEventListener('visibilitychange', onActivity);
+		window.removeEventListener('mousemove', onActivity);
 	};
 }
