@@ -13,6 +13,8 @@ export interface UpdateInfo {
 }
 
 export const availableUpdate = writable<UpdateInfo | null>(null);
+// the newest published release, newer than this one or not (used to add the dashboard to a launcher-only install)
+export const latestRelease = writable<UpdateInfo | null>(null);
 export const updateProgress = writable<{ state: string; message: string }>({ state: 'idle', message: '' });
 
 // "0.10.2" > "0.9.9"; anything that is not plain numbers is treated as not newer
@@ -36,8 +38,10 @@ export const checkForUpdate = async (): Promise<void> => {
 		if (!r.ok) return;
 		const m = await r.json();
 		const ok = ['version', 'url', 'sha256', 'sig'].every((k) => typeof m?.[k] === 'string' && m[k]);
-		if (ok && isNewer(m.version, brand.version)) {
-			availableUpdate.set({ version: m.version, url: m.url, sha256: m.sha256, sig: m.sig, notes: typeof m.notes === 'string' ? m.notes : '' });
+		if (ok) {
+			const info = { version: m.version, url: m.url, sha256: m.sha256, sig: m.sig, notes: typeof m.notes === 'string' ? m.notes : '' };
+			latestRelease.set(info);
+			availableUpdate.set(isNewer(m.version, brand.version) ? info : null);
 		} else {
 			availableUpdate.set(null);
 		}
@@ -48,9 +52,10 @@ export const checkForUpdate = async (): Promise<void> => {
 
 let polling: ReturnType<typeof setInterval> | null = null;
 
-export const installUpdate = async (u: UpdateInfo): Promise<void> => {
+export const installUpdate = async (u: UpdateInfo, addDashboard = false): Promise<void> => {
 	updateProgress.set({ state: 'downloading', message: 'Starting...' });
 	const q = new URLSearchParams({ version: u.version, url: u.url, sha256: u.sha256, sig: u.sig });
+	if (addDashboard) q.set('dashboard', '1');
 	try {
 		const r = await fetch(`/apply-update?${q.toString()}`);
 		if (!r.ok) throw new Error('refused');

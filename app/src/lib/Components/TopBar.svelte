@@ -4,6 +4,7 @@
 	import { brand } from '$lib/Util/Brand';
 
 	import { LOCAL_DASHBOARD_URL } from '$lib/Util/Config';
+	import { installUpdate, latestRelease, updateProgress } from '$lib/Util/Updates';
 
 	const { config, initialized, dashboardInstalled } = GlobalState;
 
@@ -14,6 +15,12 @@
 		($config.show_dashboard_button ?? $dashboardInstalled) && !!$config.dashboard_url
 	);
 	let starting = $state(false);
+
+	// launcher-only installs: fetch the same signed installer and run it with the dashboard ticked
+	const addingDashboard = $derived(['downloading', 'verifying', 'installing'].includes($updateProgress.state));
+	function addDashboard() {
+		if ($latestRelease) installUpdate($latestRelease, true);
+	}
 
 	// opens the dashboard in the browser; if it is the bundled app, starts it first and waits until it answers
 	async function openDashboard() {
@@ -66,6 +73,10 @@
 		{#if showDashboard}
 				<button class="ghost" type="button" title={$config.dashboard_url} disabled={starting} onclick={openDashboard}>
 					{starting ? 'Starting…' : 'Dashboard'}
+				</button>
+			{:else if !$dashboardInstalled && $latestRelease}
+				<button class="ghost" type="button" title="Download and add the flipping dashboard" disabled={addingDashboard} onclick={addDashboard}>
+					{addingDashboard ? ($updateProgress.message || 'Adding…') : 'Add flipping dashboard'}
 				</button>
 			{/if}
 		<button class="ghost" type="button" disabled={!$initialized} onclick={() => openSettings()}>

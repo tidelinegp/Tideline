@@ -746,7 +746,7 @@ static bool VerifyUpdateSignature(const std::string& message, const std::vector<
 	return ok;
 }
 
-static void RunUpdate(std::string version, std::string url, std::string sha, std::string sig_hex) {
+static void RunUpdate(std::string version, std::string url, std::string sha, std::string sig_hex, bool add_dashboard) {
 	std::vector<unsigned char> sig;
 	if (sha.size() != 64 || !HexToBytes(sig_hex, sig) || url.empty() || version.empty()) {
 		SetUpdateState("error", "The update details are invalid.");
@@ -790,6 +790,8 @@ static void RunUpdate(std::string version, std::string url, std::string sha, std
 	SetUpdateState("installing", "Installing...");
 	// /SILENT shows a small progress window; the installer closes this program, replaces the files and starts it again
 	std::wstring cmd = L"\"" + file.wstring() + L"\" /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH=1";
+		// adding the dashboard to a launcher-only install: the same signed installer, with the dashboard box ticked
+		if (add_dashboard) cmd += L" /TYPE=custom /COMPONENTS=main,dashboard";
 	STARTUPINFOW si;
 	PROCESS_INFORMATION pi;
 	ZeroMemory(&si, sizeof(si));
@@ -809,7 +811,9 @@ static void RunUpdate(std::string version, std::string url, std::string sha, std
 CefRefPtr<CefResourceRequestHandler> Browser::Launcher::ApplyUpdate(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
 #if defined(_WIN32)
 	std::string version, url, sha, sig;
+	bool add_dashboard = false;
 	ParseQuery(query, [&](const std::string_view& key, const std::string_view& val) {
+		if (key == "dashboard") { add_dashboard = (val == "1"); return; }
 		const std::string decoded = CefURIDecode(std::string(val), true, static_cast<cef_uri_unescape_rule_t>(UU_SPACES | UU_PATH_SEPARATORS | UU_URL_SPECIAL_CHARS_EXCEPT_PATH_SEPARATORS | UU_REPLACE_PLUS_WITH_SPACE)).ToString();
 		if (key == "version") version = decoded;
 		else if (key == "url") url = decoded;
@@ -824,7 +828,7 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::ApplyUpdate(CefRefPtr<Ce
 		update_state = "downloading";
 		update_message = "Starting...";
 	}
-	std::thread(RunUpdate, version, url, sha, sig).detach();
+	std::thread(RunUpdate, version, url, sha, sig, add_dashboard).detach();
 	QSENDOK();
 #else
 	QSENDNOTSUPPORTED();
