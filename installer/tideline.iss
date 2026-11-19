@@ -62,6 +62,10 @@ var
   ResultCode: Integer;
 begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM tideline-web.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // The launcher is several processes with no window Windows can ask to close, so Setup's own "close applications"
+  // step gives up and aborts. End them here first (the in-app updater starts this installer detached, so it survives).
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM tideline.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(1500);
 end;
 
 function ShouldRelaunch(): Boolean;
