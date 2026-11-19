@@ -34,6 +34,17 @@ static bool FindJava(const wchar_t* java_home, std::wstring& out) {
 			std::filesystem::path bundled = std::filesystem::path(exe_buf).parent_path() / L"jre" / L"bin" / L"javaw.exe";
 			std::error_code ec;
 			if (std::filesystem::exists(bundled, ec)) {
+				// On a scaled display (125%, 150%...) RuneLite's window looks blurry unless Windows is told how to scale
+				// this Java. This is the per-user setting behind Properties > Compatibility > "Override high DPI scaling";
+				// it needs no administrator rights and only affects this Java copy.
+				const std::wstring layer_key = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers";
+				const std::wstring layer_value = L"~ GDIDPISCALING DPIUNAWARE";
+				wchar_t existing[256] = {0};
+				DWORD existing_size = sizeof(existing) - sizeof(wchar_t);
+				const LSTATUS got = RegGetValueW(HKEY_CURRENT_USER, layer_key.c_str(), bundled.c_str(), RRF_RT_REG_SZ, nullptr, existing, &existing_size);
+				if (got != ERROR_SUCCESS || layer_value != existing) {
+					RegSetKeyValueW(HKEY_CURRENT_USER, layer_key.c_str(), bundled.c_str(), REG_SZ, layer_value.c_str(), static_cast<DWORD>((layer_value.size() + 1) * sizeof(wchar_t)));
+				}
 				out = bundled;
 				return true;
 			}
