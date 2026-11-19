@@ -2,6 +2,11 @@
 
 All notable changes to Tideline, newest first. Tideline is a modified version of [Bolt](https://github.com/Adamcake/Bolt).
 
+## 0.1.7
+- Reorder your Jagex accounts: drag an account's header up or down the list (or press Alt+Up / Alt+Down on its name). The order is remembered.
+- Flipping dashboard item tables: new "Margin x volume (24h)" column, a 3-day price trend line on every row, a Free-to-play / Members filter, a Columns menu to show or hide columns (including "Buy last seen" and "Sell last seen"), and Ctrl+K to jump to the item search.
+- Settings, About now carries the Jagex Fan Content Policy credit wording.
+
 ## 0.1.6
 - The first-run notice now says Tideline (a modified version of Bolt) and that it is not affiliated with Jagex, instead of calling itself Bolt.
 

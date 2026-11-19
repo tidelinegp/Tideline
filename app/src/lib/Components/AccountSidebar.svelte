@@ -3,6 +3,7 @@
 	import type { Session } from '$lib/Util/Interfaces';
 	import WindowControls from '$lib/Components/WindowControls.svelte';
 	import { reloadCharacters, titleMatches } from '$lib/Util/Characters';
+	import { saveConfig } from '$lib/Util/Config';
 
 	const { config, sessions, initialized, launched, clientTitles, clientSeen } = GlobalState;
 
@@ -38,7 +39,46 @@
 	} = $props();
 
 	let collapsed: { [sub: string]: boolean } = $state({});
-	const accounts = $derived(Object.entries($sessions));
+	const accounts = $derived.by(() => {
+		const order = $config.account_order ?? [];
+		const rank = (sub: string) => {
+			const i = order.indexOf(sub);
+			return i < 0 ? order.length : i;
+		};
+		// stable sort: accounts not in the saved order keep their original order, after the ones that are
+		return Object.entries($sessions).sort((a, b) => rank(a[0]) - rank(b[0]));
+	});
+
+	// drag an account's header to move it (or press Alt+Up / Alt+Down on it); the new order is saved in the config
+	let dragging: string | null = $state(null);
+	let over: string | null = $state(null);
+
+	// true when the dragged account sits above this one, so dropping moves it down past it
+	function below(sub: string): boolean {
+		const subs = accounts.map(([s]) => s);
+		return !!dragging && subs.indexOf(dragging) < subs.indexOf(sub);
+	}
+
+	function move(from: string, to: string) {
+		if (from === to) return;
+		const subs = accounts.map(([s]) => s);
+		const target = subs.indexOf(to); // dropping on an account takes its place: above it when moving up, below it when moving down
+		subs.splice(subs.indexOf(from), 1);
+		subs.splice(target, 0, from);
+		$config.account_order = subs;
+		saveConfig();
+	}
+
+	// keyboard and click alternative to dragging: shift an account one place up or down
+	function nudge(sub: string, by: -1 | 1) {
+		const subs = accounts.map(([s]) => s);
+		const i = subs.indexOf(sub);
+		const j = i + by;
+		if (j < 0 || j >= subs.length) return;
+		[subs[i], subs[j]] = [subs[j], subs[i]];
+		$config.account_order = subs;
+		saveConfig();
+	}
 
 	function isSelected(sub: string, characterId: string): boolean {
 		return (
@@ -84,8 +124,39 @@
 	<div class="accts">
 		{#each accounts as [sub, session] (sub)}
 			{@const chars = Object.entries(session.characters ?? {})}
-			<section class="acct">
-				<div class="acct-h">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<section
+				class="acct"
+				class:dragging={dragging === sub}
+				class:over={over === sub && dragging !== sub && !below(sub)}
+				class:over-below={over === sub && dragging !== sub && below(sub)}
+				ondragover={(e) => {
+					if (!dragging) return;
+					e.preventDefault();
+					over = sub;
+				}}
+				ondrop={(e) => {
+					e.preventDefault();
+					if (dragging) move(dragging, sub);
+					dragging = over = null;
+				}}
+			>
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="acct-h"
+					class:movable={accounts.length > 1}
+					draggable={accounts.length > 1}
+					ondragstart={(e) => {
+						dragging = sub;
+						e.dataTransfer?.setData('text/plain', sub);
+						if (e.dataTransfer) {
+							e.dataTransfer.effectAllowed = 'move';
+							const card = (e.currentTarget as HTMLElement).parentElement;
+							if (card) e.dataTransfer.setDragImage(card, 24, 24);
+						}
+					}}
+					ondragend={() => (dragging = over = null)}
+				>
 					<button
 						class="avatar"
 						type="button"
@@ -107,6 +178,12 @@
 						type="button"
 						aria-expanded={!collapsed[sub]}
 						onclick={() => (collapsed[sub] = !collapsed[sub])}
+						onkeydown={(e) => {
+							if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+								e.preventDefault();
+								nudge(sub, e.key === 'ArrowUp' ? -1 : 1);
+							}
+						}}
 					>
 						<span class="t">
 							<b>{session.displayName}</b>
@@ -157,7 +234,10 @@
 	>
 		Manage characters on jagex.com
 	</button>
-	<p class="hint">Click a character to select it. Click it again, or press Play, to launch.</p>
+	<p class="hint">
+		Click a character to select it. Click it again, or press Play, to launch.{#if accounts.length > 1}
+			Drag an account to reorder.{/if}
+	</p>
 </aside>
 
 <style>
@@ -222,6 +302,21 @@
 	.accts {
 		display: grid;
 		gap: 12px;
+	}
+	.acct.dragging {
+		opacity: 0.45;
+	}
+	.acct.over {
+		box-shadow: 0 -3px 0 var(--gold);
+	}
+	.acct.over-below {
+		box-shadow: 0 3px 0 var(--gold);
+	}
+	.acct-h.movable {
+		cursor: grab;
+	}
+	.acct-h.movable:active {
+		cursor: grabbing;
 	}
 	.acct {
 		background: linear-gradient(180deg, var(--s1), var(--s2));

@@ -49,6 +49,8 @@ export interface Config {
 	theme_updated?: number;
 	/** picture for each Jagex account, as an image data URL or web link, keyed by account id (sub) */
 	avatars?: { [sub: string]: string };
+	// the order accounts are shown in the sidebar (user ids); new accounts go at the end
+	account_order?: string[];
 	selected: {
 		game: Game;
 		client: Client;

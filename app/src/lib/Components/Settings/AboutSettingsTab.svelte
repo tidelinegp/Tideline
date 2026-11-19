@@ -30,10 +30,12 @@
 	<section>
 		<h4>Not affiliated with Jagex</h4>
 		<p>
-			{brand.name} uses Jagex intellectual property under Jagex's
-			<button class="link" type="button" onclick={() => open(brand.fanContentPolicyUrl)}>Fan Content Policy</button>
-			and is not endorsed by or affiliated with Jagex. RuneScape and Old School RuneScape are trademarks of
-			Jagex Limited.
+			Created using intellectual property belonging to Jagex Limited under the terms of Jagex's
+			<button class="link" type="button" onclick={() => open(brand.fanContentPolicyUrl)}>Fan Content Policy</button>.
+			This content is not endorsed by or affiliated with Jagex.
+		</p>
+		<p>
+			{brand.name} is a fan-made project. RuneScape and Old School RuneScape are trademarks of Jagex Limited.
 		</p>
 	</section>
 </div>
