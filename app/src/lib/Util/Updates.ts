@@ -55,7 +55,7 @@ let polling: ReturnType<typeof setInterval> | null = null;
 // stops a download that is still in progress (it cannot be stopped once the installer has started)
 export const cancelUpdate = async (): Promise<void> => {
 	try {
-		await fetch('/cancel-update');
+		await fetch(`/cancel-update?t=${Date.now()}`, { cache: 'no-store' });
 	} catch {
 		// nothing to cancel
 	}
@@ -66,7 +66,8 @@ export const installUpdate = async (u: UpdateInfo, addDashboard = false): Promis
 	const q = new URLSearchParams({ version: u.version, url: u.url, sha256: u.sha256, sig: u.sig });
 	if (addDashboard) q.set('dashboard', '1');
 	try {
-		const r = await fetch(`/apply-update?${q.toString()}`);
+		q.set('t', String(Date.now())); // never answered from a cached earlier attempt
+		const r = await fetch(`/apply-update?${q.toString()}`, { cache: 'no-store' });
 		if (!r.ok) throw new Error('refused');
 	} catch {
 		updateProgress.set({ state: 'error', message: 'Could not start the update.' });
@@ -75,7 +76,7 @@ export const installUpdate = async (u: UpdateInfo, addDashboard = false): Promis
 	if (polling) clearInterval(polling);
 	polling = setInterval(async () => {
 		try {
-			const s = await (await fetch('/update-status')).json();
+			const s = await (await fetch(`/update-status?t=${Date.now()}`, { cache: 'no-store' })).json();
 			updateProgress.set(s);
 			if (['error', 'cancelled', 'idle'].includes(s.state) && polling) {
 				clearInterval(polling);

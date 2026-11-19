@@ -841,6 +841,12 @@ static void RunUpdate(std::string version, std::string url, std::string sha, std
 		SetUpdateState("error", "The download did not match its checksum, so it was discarded.");
 		return;
 	}
+	// a Cancel that arrived while the file was being checked still counts: nothing has been installed yet
+	if (update_cancel.load()) {
+		std::filesystem::remove(file, ec);
+		SetUpdateState("cancelled", "Cancelled.");
+		return;
+	}
 	SetUpdateState("installing", "Installing...");
 	// /SILENT shows a small progress window; the installer closes this program, replaces the files and starts it again
 	std::wstring cmd = L"\"" + file.wstring() + L"\" /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH=1";
