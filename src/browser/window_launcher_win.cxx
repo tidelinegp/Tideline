@@ -25,16 +25,8 @@
  * @return True if the executable was found, false otherwise.
  */
 static bool FindJava(const wchar_t* java_home, std::wstring& out) {
-	if (java_home) {
-		std::filesystem::path java(java_home);
-		java.append("bin");
-		java.append("javaw.exe");
-		if (std::filesystem::exists(java)) {
-			out = java;
-			return true;
-		}
-	}
-	// Java that ships with Tideline, in a "jre" folder next to the program, so nothing else needs installing
+	// Java that ships with Tideline comes first, in a "jre" folder next to the program, so the result does not depend on
+	// whatever Java (or JAVA_HOME) the PC already has
 	{
 		wchar_t exe_buf[MAX_PATH];
 		const DWORD exe_len = GetModuleFileNameW(nullptr, exe_buf, MAX_PATH);
@@ -45,6 +37,16 @@ static bool FindJava(const wchar_t* java_home, std::wstring& out) {
 				out = bundled;
 				return true;
 			}
+		}
+	}
+	// otherwise a Java the user pointed JAVA_HOME at
+	if (java_home) {
+		std::filesystem::path java(java_home);
+		java.append("bin");
+		java.append("javaw.exe");
+		if (std::filesystem::exists(java)) {
+			out = java;
+			return true;
 		}
 	}
 	const char* path = getenv("PATH");

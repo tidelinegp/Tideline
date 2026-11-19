@@ -150,6 +150,13 @@
 	<button class="add" type="button" disabled={!$initialized} onclick={() => fetch('/login')}>
 		+ Add Jagex account
 	</button>
+	<button
+		class="manage"
+		type="button"
+		onclick={() => fetch('/open-external-url', { method: 'POST', body: 'https://account.runescape.com/en-GB/game' })}
+	>
+		Manage characters on jagex.com
+	</button>
 	<p class="hint">Click a character to select it. Click it again, or press Play, to launch.</p>
 </aside>
 
@@ -401,6 +408,19 @@
 	.add:hover:not(:disabled) {
 		color: var(--gold);
 		border-color: var(--gold);
+	}
+	.manage {
+		background: none;
+		border: 0;
+		color: var(--mut);
+		font: 600 12.5px var(--body);
+		cursor: pointer;
+		text-decoration: underline;
+		padding: 0 6px;
+		text-align: left;
+	}
+	.manage:hover {
+		color: var(--gold);
 	}
 	.hint {
 		color: var(--mut);
