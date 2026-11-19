@@ -487,8 +487,8 @@ bool Browser::App::Execute(const CefString&, CefRefPtr<CefV8Value>, const CefV8V
 	retval->SetValue(L"games", games, V8_PROPERTY_ATTRIBUTE_READONLY);
 
 	CefRefPtr<CefV8Value> disclaimer = CefV8Value::CreateArray(2);
-	disclaimer->SetValue(0, CefV8Value::CreateString(L"Qm9sdCBpcyBhbiB1bm9mZmljaWFsIHRoaXJkLXBhcnR5IGxhdW5jaGVyLiBJdCdzIGZyZWUgYW5kIG9wZW4tc291cmNlIHNvZnR3YXJlIGxpY2Vuc2VkIHVuZGVyIEFHUEwgMy4wLg=="));
-	disclaimer->SetValue(1, CefV8Value::CreateString(L"SmFnZXggaXMgbm90IHJlc3BvbnNpYmxlIGZvciBhbnkgcHJvYmxlbXMgb3IgZGFtYWdlIGNhdXNlZCBieSB1c2luZyB0aGlzIHByb2R1Y3Qu"));
+	disclaimer->SetValue(0, CefV8Value::CreateString(L"VGlkZWxpbmUgaXMgYW4gdW5vZmZpY2lhbCB0aGlyZC1wYXJ0eSBsYXVuY2hlciwgYSBtb2RpZmllZCB2ZXJzaW9uIG9mIEJvbHQuIEl0J3MgZnJlZSBhbmQgb3Blbi1zb3VyY2Ugc29mdHdhcmUgbGljZW5zZWQgdW5kZXIgQUdQTCAzLjAu"));
+	disclaimer->SetValue(1, CefV8Value::CreateString(L"VGlkZWxpbmUgaXMgbm90IGFmZmlsaWF0ZWQgd2l0aCBvciBlbmRvcnNlZCBieSBKYWdleC4gSmFnZXggaXMgbm90IHJlc3BvbnNpYmxlIGZvciBhbnkgcHJvYmxlbXMgb3IgZGFtYWdlIGNhdXNlZCBieSB1c2luZyB0aGlzIHByb2R1Y3Qu"));
 	retval->SetValue(L"disclaimer", disclaimer, V8_PROPERTY_ATTRIBUTE_READONLY);
 	return true;
 }

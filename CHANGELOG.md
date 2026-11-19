@@ -2,6 +2,9 @@
 
 All notable changes to Tideline, newest first. Tideline is a modified version of [Bolt](https://github.com/Adamcake/Bolt).
 
+## 0.1.6
+- The first-run notice now says Tideline (a modified version of Bolt) and that it is not affiliated with Jagex, instead of calling itself Bolt.
+
 ## 0.1.5
 - RuneLite now looks sharp on scaled displays (125%, 150% and so on). Tideline sets Windows' high-DPI compatibility option on its own Java copy before starting RuneLite. It is a per-user setting and needs no administrator rights.
 - Cancelling the flipping dashboard download now starts over from 0% instead of resuming. Downloads no longer go through the Windows download cache.
