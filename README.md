@@ -90,6 +90,8 @@ Tideline is free software under the **GNU Affero General Public License v3** (se
 
 ## Legal
 
-Tideline is a fan-made project. It uses Jagex intellectual property under Jagex's [Fan Content Policy](https://legal.jagex.com/docs/policies/fan-content-policy) and is not endorsed by or affiliated with Jagex. RuneScape and Old School RuneScape are trademarks of Jagex Limited.
+Created using intellectual property belonging to Jagex Limited under the terms of Jagex's [Fan Content Policy](https://legal.jagex.com/docs/policies/fan-content-policy). This content is not endorsed by or affiliated with Jagex.
+
+Tideline is a fan-made project. RuneScape and Old School RuneScape are trademarks of Jagex Limited.
 
 Using a third-party launcher is at your own risk. Jagex has not published a ruling on third-party launchers; read [Jagex's rules](https://legal.jagex.com/docs/rules/macro-and-client-features-not-permitted) and decide for yourself.
