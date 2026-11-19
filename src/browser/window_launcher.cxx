@@ -15,9 +15,9 @@
 
 #if defined(_WIN32)
 #include <windows.h>
-#include <urlmon.h>
+#include <wininet.h>
 #include <bcrypt.h>
-#pragma comment(lib, "urlmon.lib")
+#pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "bcrypt.lib")
 #endif
 
@@ -687,43 +687,6 @@ static std::atomic<unsigned long long> update_done{0};
 static std::atomic<unsigned long long> update_total{0};
 static std::atomic<bool> update_cancel{false};
 
-// Receives download progress from URLDownloadToFile, and lets the Cancel button stop the download.
-class DownloadProgress : public IBindStatusCallback {
-	LONG refs = 1;
-public:
-	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) override {
-		if (riid == IID_IUnknown || riid == IID_IBindStatusCallback) {
-			*ppv = static_cast<IBindStatusCallback*>(this);
-			AddRef();
-			return S_OK;
-		}
-		*ppv = nullptr;
-		return E_NOINTERFACE;
-	}
-	STDMETHODIMP_(ULONG) AddRef() override { return InterlockedIncrement(&refs); }
-	STDMETHODIMP_(ULONG) Release() override {
-		const ULONG r = InterlockedDecrement(&refs);
-		if (r == 0) delete this;
-		return r;
-	}
-	STDMETHODIMP OnStartBinding(DWORD, IBinding*) override { return S_OK; }
-	STDMETHODIMP GetPriority(LONG*) override { return E_NOTIMPL; }
-	STDMETHODIMP OnLowResource(DWORD) override { return S_OK; }
-	STDMETHODIMP OnProgress(ULONG progress, ULONG progress_max, ULONG, LPCWSTR) override {
-		update_done = progress;
-		update_total = progress_max;
-		return update_cancel.load() ? E_ABORT : S_OK;
-	}
-	STDMETHODIMP OnStopBinding(HRESULT, LPCWSTR) override { return S_OK; }
-	// always fetch from the server, never from Windows' download cache (a re-uploaded release would not match its checksum)
-	STDMETHODIMP GetBindInfo(DWORD* flags, BINDINFO*) override {
-		*flags = BINDF_GETNEWESTVERSION | BINDF_NOWRITECACHE;
-		return S_OK;
-	}
-	STDMETHODIMP OnDataAvailable(DWORD, DWORD, FORMATETC*, STGMEDIUM*) override { return S_OK; }
-	STDMETHODIMP OnObjectAvailable(REFIID, IUnknown*) override { return S_OK; }
-};
-
 static bool HexToBytes(const std::string& hex, std::vector<unsigned char>& out) {
 	if (hex.size() % 2 != 0) return false;
 	out.clear();
@@ -789,6 +752,48 @@ static bool VerifyUpdateSignature(const std::string& message, const std::vector<
 	return ok;
 }
 
+// Downloads `url` to `file`, updating the progress counters and stopping early when Cancel is pressed. Goes straight to the
+// network and never reads or writes Windows' download cache, so a cancelled download really starts over next time.
+// Returns 0 = done, 1 = cancelled, 2 = failed (error code in `err`).
+static int DownloadFile(const std::wstring& url, const std::filesystem::path& file, DWORD& err) {
+	err = 0;
+	HINTERNET net = InternetOpenW(L"Tideline", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+	if (!net) { err = GetLastError(); return 2; }
+	HINTERNET req = InternetOpenUrlW(net, url.c_str(), nullptr, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_NO_UI | INTERNET_FLAG_SECURE, 0);
+	if (!req) { err = GetLastError(); InternetCloseHandle(net); return 2; }
+	DWORD status = 0, status_len = sizeof(status);
+	if (!HttpQueryInfoW(req, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status, &status_len, nullptr) || status != 200) {
+		err = status ? status : GetLastError();
+		InternetCloseHandle(req);
+		InternetCloseHandle(net);
+		return 2;
+	}
+	DWORD len = 0, len_size = sizeof(len);
+	if (HttpQueryInfoW(req, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, &len, &len_size, nullptr)) update_total = len;
+	std::ofstream out(file, std::ios::binary | std::ios::trunc);
+	int result = 0;
+	if (!out) {
+		err = ERROR_ACCESS_DENIED;
+		result = 2;
+	}
+	std::vector<char> buf(1 << 16);
+	unsigned long long total_read = 0;
+	while (result == 0) {
+		if (update_cancel.load()) { result = 1; break; }
+		DWORD got = 0;
+		if (!InternetReadFile(req, buf.data(), static_cast<DWORD>(buf.size()), &got)) { err = GetLastError(); result = 2; break; }
+		if (got == 0) break;
+		out.write(buf.data(), got);
+		if (!out) { err = ERROR_DISK_FULL; result = 2; break; }
+		total_read += got;
+		update_done = total_read;
+	}
+	out.close();
+	InternetCloseHandle(req);
+	InternetCloseHandle(net);
+	return result;
+}
+
 static void RunUpdate(std::string version, std::string url, std::string sha, std::string sig_hex, bool add_dashboard) {
 	std::vector<unsigned char> sig;
 	if (sha.size() != 64 || !HexToBytes(sig_hex, sig) || url.empty() || version.empty()) {
@@ -819,19 +824,16 @@ static void RunUpdate(std::string version, std::string url, std::string sha, std
 	const int wlen = MultiByteToWideChar(CP_UTF8, 0, url.c_str(), -1, nullptr, 0);
 	std::wstring wurl(wlen > 0 ? wlen - 1 : 0, L'\0');
 	if (wlen > 1) MultiByteToWideChar(CP_UTF8, 0, url.c_str(), -1, wurl.data(), wlen);
-	DownloadProgress* progress = new DownloadProgress();
-	const HRESULT dl = URLDownloadToFileW(nullptr, wurl.c_str(), file.c_str(), 0, progress);
-	progress->Release();
-	if (dl == E_ABORT || update_cancel.load()) {
+	DWORD dl_err = 0;
+	const int dl = DownloadFile(wurl, file, dl_err);
+	if (dl == 1) {
 		std::filesystem::remove(file, ec);
 		SetUpdateState("cancelled", "Cancelled.");
 		return;
 	}
-	if (dl != S_OK) {
+	if (dl != 0) {
 		std::filesystem::remove(file, ec);
-		char code[32];
-		snprintf(code, sizeof(code), "0x%08lX", static_cast<unsigned long>(dl));
-		SetUpdateState("error", std::string("The download failed (") + code + "). Check your connection and try again.");
+		SetUpdateState("error", "The download failed (code " + std::to_string(dl_err) + "). Check your connection and try again.");
 		return;
 	}
 	SetUpdateState("verifying", "Checking the download...");
