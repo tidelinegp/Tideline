@@ -21,6 +21,7 @@
 #pragma comment(lib, "bcrypt.lib")
 #endif
 
+#include <atomic>
 #include <mutex>
 #include <thread>
 #include "../sha256/sha256.h"
@@ -334,6 +335,7 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::GetResourceRequestHandle
 		ROUTE("start-dashboard", StartDashboard)
 		ROUTE("apply-update", ApplyUpdate)
 		ROUTE("update-status", UpdateStatus)
+		ROUTE("cancel-update", CancelUpdate)
 		ROUTEIFPLUGINS("save-plugin-config", SavePluginConfig)
 		ROUTEIFPLUGINS("list-game-clients", ListGameClients)
 		ROUTEIFPLUGINS("read-json-file", ReadJsonFile)
@@ -681,6 +683,47 @@ static void SetUpdateState(const std::string& state, const std::string& message 
 	update_message = message;
 }
 
+static std::atomic<unsigned long long> update_done{0};
+static std::atomic<unsigned long long> update_total{0};
+static std::atomic<bool> update_cancel{false};
+
+// Receives download progress from URLDownloadToFile, and lets the Cancel button stop the download.
+class DownloadProgress : public IBindStatusCallback {
+	LONG refs = 1;
+public:
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) override {
+		if (riid == IID_IUnknown || riid == IID_IBindStatusCallback) {
+			*ppv = static_cast<IBindStatusCallback*>(this);
+			AddRef();
+			return S_OK;
+		}
+		*ppv = nullptr;
+		return E_NOINTERFACE;
+	}
+	STDMETHODIMP_(ULONG) AddRef() override { return InterlockedIncrement(&refs); }
+	STDMETHODIMP_(ULONG) Release() override {
+		const ULONG r = InterlockedDecrement(&refs);
+		if (r == 0) delete this;
+		return r;
+	}
+	STDMETHODIMP OnStartBinding(DWORD, IBinding*) override { return S_OK; }
+	STDMETHODIMP GetPriority(LONG*) override { return E_NOTIMPL; }
+	STDMETHODIMP OnLowResource(DWORD) override { return S_OK; }
+	STDMETHODIMP OnProgress(ULONG progress, ULONG progress_max, ULONG, LPCWSTR) override {
+		update_done = progress;
+		update_total = progress_max;
+		return update_cancel.load() ? E_ABORT : S_OK;
+	}
+	STDMETHODIMP OnStopBinding(HRESULT, LPCWSTR) override { return S_OK; }
+	// always fetch from the server, never from Windows' download cache (a re-uploaded release would not match its checksum)
+	STDMETHODIMP GetBindInfo(DWORD* flags, BINDINFO*) override {
+		*flags = BINDF_GETNEWESTVERSION | BINDF_NOWRITECACHE;
+		return S_OK;
+	}
+	STDMETHODIMP OnDataAvailable(DWORD, DWORD, FORMATETC*, STGMEDIUM*) override { return S_OK; }
+	STDMETHODIMP OnObjectAvailable(REFIID, IUnknown*) override { return S_OK; }
+};
+
 static bool HexToBytes(const std::string& hex, std::vector<unsigned char>& out) {
 	if (hex.size() % 2 != 0) return false;
 	out.clear();
@@ -776,8 +819,19 @@ static void RunUpdate(std::string version, std::string url, std::string sha, std
 	const int wlen = MultiByteToWideChar(CP_UTF8, 0, url.c_str(), -1, nullptr, 0);
 	std::wstring wurl(wlen > 0 ? wlen - 1 : 0, L'\0');
 	if (wlen > 1) MultiByteToWideChar(CP_UTF8, 0, url.c_str(), -1, wurl.data(), wlen);
-	if (URLDownloadToFileW(nullptr, wurl.c_str(), file.c_str(), 0, nullptr) != S_OK) {
-		SetUpdateState("error", "The download failed. Check your connection and try again.");
+	DownloadProgress* progress = new DownloadProgress();
+	const HRESULT dl = URLDownloadToFileW(nullptr, wurl.c_str(), file.c_str(), 0, progress);
+	progress->Release();
+	if (dl == E_ABORT || update_cancel.load()) {
+		std::filesystem::remove(file, ec);
+		SetUpdateState("cancelled", "Cancelled.");
+		return;
+	}
+	if (dl != S_OK) {
+		std::filesystem::remove(file, ec);
+		char code[32];
+		snprintf(code, sizeof(code), "0x%08lX", static_cast<unsigned long>(dl));
+		SetUpdateState("error", std::string("The download failed (") + code + "). Check your connection and try again.");
 		return;
 	}
 	SetUpdateState("verifying", "Checking the download...");
@@ -827,6 +881,9 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::ApplyUpdate(CefRefPtr<Ce
 		}
 		update_state = "downloading";
 		update_message = "Starting...";
+		update_done = 0;
+		update_total = 0;
+		update_cancel = false;
 	}
 	std::thread(RunUpdate, version, url, sha, sig, add_dashboard).detach();
 	QSENDOK();
@@ -839,7 +896,7 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::UpdateStatus(CefRefPtr<C
 	std::string json = "{\"state\":\"idle\",\"message\":\"\"}";
 #if defined(_WIN32)
 	std::lock_guard<std::mutex> lock(update_mutex);
-	json = "{\"state\":\"" + update_state + "\",\"message\":\"";
+	json = "{\"done\":" + std::to_string(update_done.load()) + ",\"total\":" + std::to_string(update_total.load()) + ",\"state\":\"" + update_state + "\",\"message\":\"";
 	for (const char c : update_message) {
 		if (c == '"' || c == '\\') json += '\\';
 		if (static_cast<unsigned char>(c) >= 0x20) json += c;
@@ -847,6 +904,16 @@ CefRefPtr<CefResourceRequestHandler> Browser::Launcher::UpdateStatus(CefRefPtr<C
 	json += "\"}";
 #endif
 	return new Browser::ResourceHandler(json, 200, "application/json");
+}
+
+// Stops a download in progress (the Cancel button). Once the installer itself has started it cannot be stopped from here.
+CefRefPtr<CefResourceRequestHandler> Browser::Launcher::CancelUpdate(CefRefPtr<CefRequest> request, CefRefPtr<CefBrowser> browser, std::string_view query) {
+#if defined(_WIN32)
+	update_cancel = true;
+	QSENDOK();
+#else
+	QSENDNOTSUPPORTED();
+#endif
 }
 
 CefRefPtr<CefDragHandler> Browser::Launcher::GetDragHandler() {

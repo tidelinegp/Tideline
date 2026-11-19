@@ -61,6 +61,20 @@
 			<small>Adds a button to the top bar that opens the link above in your browser.</small>
 		</span>
 	</label>
+	{#if !$dashboardInstalled}
+		<label class="opt">
+			<input
+				id="offer_download"
+				type="checkbox"
+				checked={!$config.hide_dashboard_download}
+				onchange={(e) => ($config.hide_dashboard_download = !(e.currentTarget as HTMLInputElement).checked)}
+			/>
+			<span>
+				<b>Offer to download the flipping dashboard</b>
+				<small>Shows a Download flipping dashboard button in the top bar. Untick it if you only want the launcher.</small>
+			</span>
+		</label>
+	{/if}
 	<label class="opt">
 		<input id="sync_theme" type="checkbox" bind:checked={$config.sync_dashboard_theme} />
 		<span>

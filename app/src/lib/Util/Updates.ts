@@ -15,7 +15,7 @@ export interface UpdateInfo {
 export const availableUpdate = writable<UpdateInfo | null>(null);
 // the newest published release, newer than this one or not (used to add the dashboard to a launcher-only install)
 export const latestRelease = writable<UpdateInfo | null>(null);
-export const updateProgress = writable<{ state: string; message: string }>({ state: 'idle', message: '' });
+export const updateProgress = writable<{ state: string; message: string; done?: number; total?: number }>({ state: 'idle', message: '' });
 
 // "0.10.2" > "0.9.9"; anything that is not plain numbers is treated as not newer
 export const isNewer = (candidate: string, current: string): boolean => {
@@ -52,6 +52,15 @@ export const checkForUpdate = async (): Promise<void> => {
 
 let polling: ReturnType<typeof setInterval> | null = null;
 
+// stops a download that is still in progress (it cannot be stopped once the installer has started)
+export const cancelUpdate = async (): Promise<void> => {
+	try {
+		await fetch('/cancel-update');
+	} catch {
+		// nothing to cancel
+	}
+};
+
 export const installUpdate = async (u: UpdateInfo, addDashboard = false): Promise<void> => {
 	updateProgress.set({ state: 'downloading', message: 'Starting...' });
 	const q = new URLSearchParams({ version: u.version, url: u.url, sha256: u.sha256, sig: u.sig });
@@ -68,7 +77,7 @@ export const installUpdate = async (u: UpdateInfo, addDashboard = false): Promis
 		try {
 			const s = await (await fetch('/update-status')).json();
 			updateProgress.set(s);
-			if (s.state === 'error' && polling) {
+			if (['error', 'cancelled', 'idle'].includes(s.state) && polling) {
 				clearInterval(polling);
 				polling = null;
 			}

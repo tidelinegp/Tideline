@@ -41,6 +41,8 @@ export interface Config {
 	dashboard_url?: string;
 	/** show an "Open dashboard" button in the top bar */
 	show_dashboard_button?: boolean;
+	/** do not offer the "Download flipping dashboard" button when the dashboard is not installed */
+	hide_dashboard_download?: boolean;
 	/** share the colour theme with the dashboard at dashboard_url */
 	sync_dashboard_theme?: boolean;
 	/** when the theme was last changed here or taken from the dashboard, in ms since epoch */

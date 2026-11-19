@@ -126,6 +126,7 @@ namespace Browser {
 		CefRefPtr<CefResourceRequestHandler> StartDashboard(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 		CefRefPtr<CefResourceRequestHandler> ApplyUpdate(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 		CefRefPtr<CefResourceRequestHandler> UpdateStatus(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
+		CefRefPtr<CefResourceRequestHandler> CancelUpdate(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);
 
 #if defined(BOLT_PLUGINS)
 		CefRefPtr<CefResourceRequestHandler> SavePluginConfig(CefRefPtr<CefRequest>, CefRefPtr<CefBrowser>, std::string_view);

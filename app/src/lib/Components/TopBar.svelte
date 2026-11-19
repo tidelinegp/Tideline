@@ -4,7 +4,7 @@
 	import { brand } from '$lib/Util/Brand';
 
 	import { LOCAL_DASHBOARD_URL } from '$lib/Util/Config';
-	import { installUpdate, latestRelease, updateProgress } from '$lib/Util/Updates';
+	import { cancelUpdate, installUpdate, latestRelease, updateProgress } from '$lib/Util/Updates';
 
 	const { config, initialized, dashboardInstalled } = GlobalState;
 
@@ -18,6 +18,14 @@
 
 	// launcher-only installs: fetch the same signed installer and run it with the dashboard ticked
 	const addingDashboard = $derived(['downloading', 'verifying', 'installing'].includes($updateProgress.state));
+	const pct = $derived(
+		$updateProgress.state === 'downloading' && ($updateProgress.total ?? 0) > 0
+			? Math.min(100, Math.round((($updateProgress.done ?? 0) / ($updateProgress.total ?? 1)) * 100))
+			: $updateProgress.state === 'downloading'
+				? 0
+				: 100
+	);
+	const mb = (n: number | undefined) => ((n ?? 0) / 1048576).toFixed(0);
 	function addDashboard() {
 		if ($latestRelease) installUpdate($latestRelease, true);
 	}
@@ -74,10 +82,31 @@
 				<button class="ghost" type="button" title={$config.dashboard_url} disabled={starting} onclick={openDashboard}>
 					{starting ? 'Starting…' : 'Dashboard'}
 				</button>
-			{:else if !$dashboardInstalled && $latestRelease}
-				<button class="ghost" type="button" title="Download and add the flipping dashboard" disabled={addingDashboard} onclick={addDashboard}>
-					{addingDashboard ? ($updateProgress.message || 'Adding…') : 'Add flipping dashboard'}
-				</button>
+			{:else if !$dashboardInstalled && $latestRelease && !$config.hide_dashboard_download}
+				{#if addingDashboard}
+					<div class="dl" role="status">
+						<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
+							<span style="width: {pct}%"></span>
+						</div>
+						<small>
+							{#if $updateProgress.state === 'downloading'}
+								Downloading {pct}%{#if ($updateProgress.total ?? 0) > 0} ({mb($updateProgress.done)} of {mb($updateProgress.total)} MB){/if}
+							{:else}
+								{$updateProgress.message}
+							{/if}
+						</small>
+						{#if $updateProgress.state === 'downloading'}
+							<button class="ghost" type="button" onclick={cancelUpdate}>Cancel</button>
+						{/if}
+					</div>
+				{:else}
+					<button class="ghost" type="button" title="Download the flipping dashboard (about 150 MB)" onclick={addDashboard}>
+						Download flipping dashboard
+					</button>
+					{#if $updateProgress.state === 'error'}
+						<small class="err">{$updateProgress.message}</small>
+					{/if}
+				{/if}
 			{/if}
 		<button class="ghost" type="button" disabled={!$initialized} onclick={() => openSettings()}>
 			Settings
@@ -164,6 +193,33 @@
 	.ghost:hover:not(:disabled) {
 		color: var(--txt);
 		border-color: var(--inpb);
+	}
+	.dl {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.dl small {
+		margin: 0;
+		white-space: nowrap;
+	}
+	.bar {
+		width: 150px;
+		height: 8px;
+		border-radius: 99px;
+		background: var(--s2);
+		border: 1px solid var(--line);
+		overflow: hidden;
+	}
+	.bar span {
+		display: block;
+		height: 100%;
+		background: var(--pos, #3fb950);
+		transition: width 0.3s;
+	}
+	.err {
+		color: #e5484d;
+		margin: 0;
 	}
 	button:focus-visible {
 		outline: none;
