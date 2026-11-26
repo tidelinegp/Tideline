@@ -3,7 +3,7 @@
 
 export const brand = {
 	name: 'Tideline',
-	version: '0.1.7',
+	version: '0.1.8',
 	basedOn: 'Bolt',
 	basedOnAuthor: 'Adamcake',
 	basedOnUrl: 'https://codeberg.org/Adamcake/Bolt',

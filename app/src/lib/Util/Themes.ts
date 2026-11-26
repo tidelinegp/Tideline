@@ -15,8 +15,8 @@ export interface Theme extends ThemeColors {
 }
 
 export const themes: Theme[] = [
-	// the app's own look: deep sea with sand and surf, matching the icon
-	{ id: 'tideline', name: 'Tideline', bg: '#0a1c28', accent: '#52b6e6', accent2: '#ecd3a0', txt: '#e9f3f7' },
+	// the app's own look: a mid-dark sea blue with sand highlights, matching the icon
+	{ id: 'tideline', name: 'Tideline', bg: '#26405a', accent: '#e8d4a8', accent2: '#5fa2d0', txt: '#eaf0f6' },
 	{ id: 'sandbar', name: 'Sandbar', bg: '#f3e9d2', accent: '#1d7fb3', accent2: '#b98f55', txt: '#22303a' },
 	{ id: 'gielinor', name: 'Gielinor', bg: '#0b0e14', accent: '#f0c14b', accent2: '#6cb2ff', txt: '#e8ebf2' },
 	{ id: 'stone', name: 'Stone', bg: '#1d1913', accent: '#ffd43a', accent2: '#8cc0e0', txt: '#f0e7d3' },

@@ -2,6 +2,12 @@
 
 All notable changes to Tideline, newest first. Tideline is a modified version of [Bolt](https://github.com/Adamcake/Bolt).
 
+## 0.1.8
+- The default Tideline theme is now a mid-dark sea blue with sand highlights, matching the icon, in both the launcher and the flipping dashboard.
+- Accounts sidebar: the window buttons and the Accounts heading stay put while the account list scrolls.
+- Fixed a stray blue ring around the selected character's picture.
+- Fixed a missing space in the hint under the account list.
+
 ## 0.1.7
 - Reorder your Jagex accounts: drag an account's header up or down the list (or press Alt+Up / Alt+Down on its name). The order is remembered.
 - Flipping dashboard item tables: new "Margin x volume (24h)" column, a 3-day price trend line on every row, a Free-to-play / Members filter, a Columns menu to show or hide columns (including "Buy last seen" and "Sell last seen"), and Ctrl+K to jump to the item search.

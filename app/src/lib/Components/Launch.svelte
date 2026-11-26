@@ -153,7 +153,7 @@
 
 <section class="hero" aria-label="Ready to play">
 	<div class="who">
-		<div class="ring" aria-hidden="true">
+		<div class="who-ring" aria-hidden="true">
 			{#if selectedUserId && $config.avatars?.[selectedUserId]}
 				<img src={$config.avatars[selectedUserId]} alt="" />
 			{:else}
@@ -238,7 +238,7 @@
 		gap: 18px;
 		min-width: 0;
 	}
-	.ring {
+	.who-ring {
 		flex: none;
 		width: 64px;
 		height: 64px;
@@ -251,7 +251,7 @@
 		border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--inpb));
 		overflow: hidden;
 	}
-	.ring img {
+	.who-ring img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;

@@ -121,6 +121,7 @@
 		</button>
 	</div>
 
+	<div class="side-scroll">
 	<div class="accts">
 		{#each accounts as [sub, session] (sub)}
 			{@const chars = Object.entries(session.characters ?? {})}
@@ -235,9 +236,9 @@
 		Manage characters on jagex.com
 	</button>
 	<p class="hint">
-		Click a character to select it. Click it again, or press Play, to launch.{#if accounts.length > 1}
-			Drag an account to reorder.{/if}
+		Click a character to select it. Click it again, or press Play, to launch.{#if accounts.length > 1}{' '}Drag an account to reorder.{/if}
 	</p>
+	</div>
 </aside>
 
 <style>
@@ -250,17 +251,26 @@
 			color-mix(in srgb, var(--side) 66%, transparent),
 			color-mix(in srgb, var(--side) 88%, transparent)
 		);
-		padding: 22px 16px 18px;
+		padding: 22px 0 0 16px;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		overflow: hidden;
+	}
+	/* only this part scrolls: the window buttons and the Accounts heading above it stay where they are */
+	.side-scroll {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
 		gap: 14px;
-		min-width: 0;
-		overflow-y: auto;
+		padding: 0 16px 18px 0;
 	}
 	.winbar {
 		display: flex;
 		height: 36px;
-		margin: -22px -16px 0;
+		margin: -22px 0 0 -16px;
 		flex: none;
 	}
 	.drag {
@@ -271,7 +281,9 @@
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
-		padding: 0 6px;
+		padding: 0 22px 0 6px;
+		margin: 14px 0 12px;
+		flex: none;
 	}
 	.side-h h2 {
 		margin: 0;
